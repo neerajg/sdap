@@ -1,0 +1,9 @@
+test hotStart
+models bae
+submodels linear
+datasets movielens
+K 2
+L 4
+reg_beta 0.2
+reg_alpha1 0.1
+reg_alpha2 0.3
