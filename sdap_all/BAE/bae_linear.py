@@ -65,42 +65,53 @@ def train_bae_linear(K, L, X1, X2, train_I, train_J, train_Y, reg_beta, num_iter
 ###################################################################################################################################
 def e_step(K, L, X_composite, train_I, train_J, train_Y, alphas, betas, gammas, r, M, N, num_iter,delta_convg):
     # Until Convergence
+    # Changed from using log likelihood to parameter convergence
     e_convg = False
     t = 0
-    delta_likelihood = 1e99
-    log_likelihood_e_step = -1e99*np.ones((num_iter+1))
     while e_convg == False and t < num_iter :
-        r = update_r(gammas, r, betas, train_Y, train_I, train_J, K, L, M, N, X_composite)
+        r_old = r
+        gammas_old = gammas
+        temp = 10000
+        if t == 0:
+            divisor = 2
+        else:
+            divisor = temp
+        r = update_r(gammas, r, betas, train_Y, train_I, train_J, K, L, M, N, X_composite, temp, divisor)
         gammas = update_gammas(gammas, alphas, r, betas, train_Y, train_I, train_J, K, L, M, N, X_composite)  
         # Test for Convergence
         t +=1
-        log_likelihood_e_step[t] = get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,gammas,r,train_I,train_J, train_Y,X_composite)
-        delta_likelihood = log_likelihood_e_step[t]-log_likelihood_e_step[t-1]
-        delta_likelihood = delta_likelihood*100/abs(log_likelihood_e_step[t-1])
-        if delta_likelihood < delta_convg:
+        delta = np.sum(np.abs(r[0] - r_old[0])) + np.sum(np.abs(gammas[0] - gammas_old[0]))
+        delta += np.sum(np.abs(r[1] - r_old[1])) + np.sum(np.abs(gammas[1] - gammas_old[1]))
+        if delta < delta_convg:
             e_convg = True
     return gammas, r
 
 def update_gammas(gammas, alphas, r, betas, train_Y, train_I, train_J, K, L, M, N, X_composite):
     gamma1 = gammas[0]
     gamma2 = gammas[1]
+    gammas_new = [np.zeros(gamma1.shape),np.zeros(gamma2.shape)]
     temp1 = get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,gammas,r,train_I,train_J, train_Y,X_composite)
-    gammas[0] = np.tile(alphas[0].reshape(1,K), (M,1)) + r[0] # M x K
+    gammas_new[0] = np.tile(alphas[0].reshape(1,K), (M,1)) + r[0] # M x K
     temp2 = get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,gammas,r,train_I,train_J, train_Y,X_composite) 
     if temp1>=temp2:
-        gammas[0] = gamma1
+        gammas_new[0] = gamma1
     
     temp1 = get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,gammas,r,train_I,train_J, train_Y,X_composite)
-    gammas[1] = np.tile(alphas[1].reshape(1,L), (N,1)) + r[1] # N x L
+    gammas_new[1] = np.tile(alphas[1].reshape(1,L), (N,1)) + r[1] # N x L
     temp2 = get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,gammas,r,train_I,train_J, train_Y,X_composite) 
     if temp1>=temp2:
-        gammas[1] = gamma2
+        gammas_new[1] = gamma2
+    
+    gammas = gammas_new
     return gammas
 
-def update_r(gammas, r, betas, train_Y, train_I, train_J, K, L, M, N, X_composite):
-    # TO DO : check out the simulated annealing bit here and vectorize/matricize
+def update_r(gammas, r, betas, train_Y, train_I, train_J, K, L, M, N, X_composite, temp, divisor):
+    # This is the simulated annealing version
+    # TO DO : vectorize/matricize
     #r1_mk \prop to exp(psi(gamma1_mk) - psi(sum(gamma1_mk)) + gaussian probability)
     # Initializations
+
+    t = temp
     X = X_composite # |Yobs| x (1 + D1 + D2)
     r1 = r[0] # M x K
     r2 = r[1] # N x L
@@ -108,56 +119,69 @@ def update_r(gammas, r, betas, train_Y, train_I, train_J, K, L, M, N, X_composit
     gamma2 = gammas[1] # N x L
     beta = betas[0] # K x L x (1 + D1 + D2)
     sigmaY = betas[1] # K x L
+    convergence = False
+    r1_old = np.zeros((r1.shape))
+    r2_old = np.zeros((r2.shape))
+    while t>1 or convergence == False:
+        log_r1 = np.zeros((r1.shape))
+        log_r2 = np.zeros((r2.shape))
+        r1_new = np.zeros((r1.shape))
+        r2_new = np.zeros((r2.shape))
 
-    log_r1 = np.zeros((r1.shape))
-    log_r2 = np.zeros((r2.shape))
-    r1_new = np.zeros((r1.shape))
-    r2_new = np.zeros((r2.shape))
-
-    Yobs = train_Y
-    temp1 = np.zeros((Yobs.shape[0],K))
-    temp2 = np.zeros((Yobs.shape[0],L))
+        Yobs = train_Y
+        temp1 = np.zeros((Yobs.shape[0],K))
+        temp2 = np.zeros((Yobs.shape[0],L))
     
-    # r1,r2 update
-    log_r1 += digamma(gamma1)# - digamma(np.sum(gamma1[P,:]))            
-    log_r2 += digamma(gamma2)# - digamma(np.sum(gamma2[Q,:]))
-    for k in range(K):
-        # p(y|beta*x)
+        # r1,r2 update
+    
+        log_r1 += digamma(gamma1)# - digamma(np.sum(gamma1[P,:]))            
+        log_r2 += digamma(gamma2)# - digamma(np.sum(gamma2[Q,:]))
+        for k in range(K):
+            # p(y|beta*x)
+            for l in range(L):
+                beta_times_x = np.dot(X,beta[k,l,:]) # (|Yobs| x 1)
+                r2_temp = np.tile(np.transpose(r2[:,l]).reshape(1,N), (M,1))[train_I, train_J] # |Yobs| x 1            
+                temp1[:,k] += (-.5*np.log(2*np.pi*sigmaY[k,l]) - (.5/(sigmaY[k,l]))*((Yobs- beta_times_x)**2) )* r2_temp
+                r1_temp = np.tile(r1[:,k].reshape(M,1), (1,N))[train_I, train_J] # |Yobs| x 1             
+                temp2[:,l] += (-.5*np.log(2*np.pi*sigmaY[k,l]) - (.5/(sigmaY[k,l]))*((Yobs- beta_times_x)**2) )* r1_temp
+    
+        for k in range(K):
+            log_r1[:,k] += np.array(sp.csr_matrix((temp1[:,k],(train_I, train_J)),shape=(M,N)).sum(1)).flatten()
         for l in range(L):
-            beta_times_x = np.dot(X,beta[k,l,:]) # (|Yobs| x 1)
-            r2_temp = np.tile(np.transpose(r2[:,l]).reshape(1,N), (M,1))[train_I, train_J] # |Yobs| x 1            
-            temp1[:,k] += (-.5*np.log(2*np.pi*sigmaY[k,l]) - (.5/(sigmaY[k,l]))*((Yobs- beta_times_x)**2) )* r2_temp
-            r1_temp = np.tile(r1[:,k].reshape(M,1), (1,N))[train_I, train_J] # |Yobs| x 1             
-            temp2[:,l] += (-.5*np.log(2*np.pi*sigmaY[k,l]) - (.5/(sigmaY[k,l]))*((Yobs- beta_times_x)**2) )* r1_temp
-    
-    for k in range(K):
-        log_r1[:,k] += np.array(sp.csr_matrix((temp1[:,k],(train_I, train_J)),shape=(M,N)).sum(1)).flatten()
-    for l in range(L):
-        log_r2[:,l] += np.array(sp.csr_matrix((temp2[:,l],(train_I, train_J)),shape=(M,N)).sum(0).reshape(N,)).flatten()
+            log_r2[:,l] += np.array(sp.csr_matrix((temp2[:,l],(train_I, train_J)),shape=(M,N)).sum(0).reshape(N,)).flatten()
             
 
-    # Prevent underflow by using a transformed method to get to normalized product space:
-    # (e^x) / (e^x + e^y) = 1 / (1 + e^(y-x))
-    # instead of trying to calculate e^x and e^y directly, just use e^(y-x).
-    for k in range(K):
-        old_settings = np.seterr(over='ignore')
-        r1_new[:,k] = 1 / (1 + np.sum(np.exp(np.delete(log_r1,k,axis=1)-np.tile(log_r1[:,k].reshape(M,1),(1,K-1))),axis=1))
-        np.seterr(**old_settings) 
+        # Prevent underflow by using a transformed method to get to normalized product space:
+        # (e^x) / (e^x + e^y) = 1 / (1 + e^(y-x))
+        # intead of trying to calculate e^x and e^y directly, just use e^(y-x).
+        log_r1 = log_r1/t
+        for k in range(K):
+            old_settings = np.seterr(over='ignore')
+            r1_new[:,k] = 1 / (1 + np.sum(np.exp(np.delete(log_r1,k,axis=1)-np.tile(log_r1[:,k].reshape(M,1),(1,K-1))),axis=1))
+            np.seterr(**old_settings) 
         
-    # Prevent underflow by using a transformed method to get to normalized product space:
-    # (e^x) / (e^x + e^y) = 1 / (1 + e^(y-x))
-    # instead of trying to calculate e^x and e^y directly, just use e^(y-x).
-    for l in range(L):
-        old_settings = np.seterr(over='ignore')
-        r2_new[:,l] = 1 / (1 + np.sum(np.exp(np.delete(log_r2,l,axis=1)-np.tile(log_r2[:,l].reshape(N,1),(1,L-1))),axis=1))
-        np.seterr(**old_settings)
+        # Prevent underflow by using a transformed method to get to normalized product space:
+        # (e^x) / (e^x + e^y) = 1 / (1 + e^(y-x))
+        # instead of trying to calculate e^x and e^y directly, just use e^(y-x).
+        log_r2 = log_r2/t
+        for l in range(L):
+            old_settings = np.seterr(over='ignore')
+            r2_new[:,l] = 1 / (1 + np.sum(np.exp(np.delete(log_r2,l,axis=1)-np.tile(log_r2[:,l].reshape(N,1),(1,L-1))),axis=1))
+            np.seterr(**old_settings)
     
-    r1_new[r1_new<1e-6]=1e-6
-    #if K !=1:
+        r1_new[r1_new<1e-6]=1e-6
+        #if K !=1:
         #r1_new[r1_new>0.9]=0.9
-    r2_new[r2_new<1e-6]=1e-6
-    #if L !=1:
+        r2_new[r2_new<1e-6]=1e-6
+        #if L !=1:
         #r2_new[r2_new>0.9]=0.9
+        if t == 1:
+            delta = np.sum(np.abs(r1_old - r1_new)) + np.sum(np.abs(r2_old - r2_new))
+            if (delta)<1e-6 and t == 1:
+                convergence = True
+        r1_old = r1_new
+        r2_old = r2_new
+        t = max(1,t/divisor)        
         
     r = [r1_new, r2_new]
     return r

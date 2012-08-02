@@ -10,6 +10,7 @@ from numpy.random import randint
 from numpy.random.mtrand import dirichlet
 from scipy.special import gammaln as gammaln
 from scipy.special import psi as digamma
+from scipy.special import polygamma
 
 def initialize(X1, X2, train_I, train_J, train_Y, K, L):
     M = X1.shape[0]
@@ -60,8 +61,8 @@ def objective_fn(alpha, gamma, reg_alpha):
     # TO DO: vectorize this over k
     M,K = gamma.shape
     fn = M*(gammaln(np.sum(alpha)) - np.sum(gammaln(alpha)) - reg_alpha*np.sum(alpha**2))
-    grad = M*digamma(np.sum(alpha))*np.ones((K,))  
-    
+    grad = M*digamma(np.sum(alpha))*np.ones((K,))
+     
     for k in range(K):
         # Denominator of B(alpha)
         #fn -= M*gammaln(alpha[k])
@@ -69,7 +70,7 @@ def objective_fn(alpha, gamma, reg_alpha):
         fn += (alpha[k] - 1)*np.sum(digamma(gamma[:,k]) - digamma(np.sum(gamma,1)))
         grad[k] += np.sum(digamma(gamma[:,k]) - digamma(np.sum(gamma,1)))
     
-    return -fn, -grad
+    return -fn, -grad,
 
 def sample_discrete(pi,shape):
     Z = (np.zeros(shape))
@@ -131,3 +132,47 @@ def get_loglikelihood_art_data(alphas, pis, zs, betas, I, J, Y, X1, X2, model_na
             log_likelihood_data += (-.5*np.log(2*np.pi*(sigma_Y**2))-(.5/(sigma_Y**2))*(Y[o]**2 - 2*Y[o]*beta_times_x + beta_times_x**2))
         
     return log_likelihood_data
+
+def objective_fn_nr(alpha, gamma, reg_alpha):
+    # TO DO: vectorize this over k
+    M,K = gamma.shape
+    fn = M*(gammaln(np.sum(alpha)) - np.sum(gammaln(alpha)) - reg_alpha*np.sum(alpha**2))
+    grad = M*digamma(np.sum(alpha))*np.ones((K,))
+    hessian = M*polygamma(1,np.sum(alpha))*np.ones((K,K))
+    hessian -= np.diag(np.array(M*polygamma(1,alpha)), k = 0)
+     
+    for k in range(K):
+        # Denominator of B(alpha)
+        #fn -= M*gammaln(alpha[k])
+        grad[k] += - M*(digamma(alpha[k]) - 2*reg_alpha*alpha[k]) # TO DO : This gives overflow errors sometime (check it out)
+        fn += (alpha[k] - 1)*np.sum(digamma(gamma[:,k]) - digamma(np.sum(gamma,1)))
+        grad[k] += np.sum(digamma(gamma[:,k]) - digamma(np.sum(gamma,1)))
+    
+    return fn, grad, hessian
+
+def newtn_raphson(alpha, gamma, reg_alpha):
+    convergence = False
+    objective_old = 0
+    alpha_old = np.zeros(alpha.shape) + alpha
+    first = True
+    delta = 1e99
+    eta = 1
+    while convergence == False:
+        alpha_new = np.zeros(alpha.shape)
+        objective, gradient,hessian = objective_fn_nr(alpha_old, gamma, reg_alpha)
+        delta = objective - objective_old
+        objective_old = objective
+        if delta < 1e-4:
+            convergence = True
+            break
+        alpha_new = alpha_old + eta*np.dot(np.matrix(hessian).I,gradient)
+        less_than_zero = False
+        for x in alpha_new:
+            if x <=0:
+                less_than_zero = True
+                eta = eta/2
+                break
+        if less_than_zero == False:
+            alpha_old = alpha_new
+            
+    return alpha_old
