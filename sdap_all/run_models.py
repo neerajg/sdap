@@ -13,9 +13,9 @@ import writeResults as op
 import run_model as runModel
 
 import os
-sys.path.append(os.path.abspath('./BAE/'))
-import bae_linear as bae_linear
-import numpy as np
+#sys.path.append(os.path.abspath('./BAE/'))
+#import bae_linear as bae_linear
+#import numpy as np
 from  analyzeRMSE import analyzeRMSE
 
 # TO DO : for now we are using hard assignment for the attribute clusters for the warm and cold start cases
@@ -61,19 +61,6 @@ def run_models(datasetName,test, model_name,K,L,reg_lambda,reg_alpha1,reg_alpha2
                 #log_likelihood_art_data = data.get_likelihood_art_data(alphas, pis, zs, betas, train_I, train_J, train_Y, trctd_X1, trctd_X2, datasetName, model_name)    
             train_op = runModel.runModelHotStart(model_name, K, L, trctd_X1, trctd_X2, train_I, train_J, train_Y, reg_lambda, num_iter, delta_convg, reg_alpha1,reg_alpha2,)
             
-            #alphas = train_op['params']['alphas']
-            #betas = train_op['params']['betas']
-            #gammas = train_op['params']['gammas']
-            #r = train_op['params']['r']
-            #X1 = train_op['params']['Xs'][0]
-            #X2 = train_op['params']['Xs'][1]
-            #Xbias = np.ones((len(train_I),1)) # |Yobs| x 1
-            #Xusers = X1[train_I,:] # |Yobs| x D1
-            #Xitems = X2[train_J,:] # |Yobs| x D2
-            #X_composite = np.hstack((Xbias, Xusers, Xitems)) # |Yobs| x (1 + D1 + D2)
-            #M = X1.shape[0]
-            #N = X2.shape[0]
-            #bae_linear.get_log_likelihood_lower_bound(K, L, M, N, alphas, betas, gammas, r, train_I, train_J, train_Y, X_composite)
             print "  DONE TRAINING "+model_name+" FOR FOLD "+str(fold+1)   
             
             # Calculate Hot Start Training RMSE
@@ -239,7 +226,7 @@ if __name__ == '__main__':
                                 print reg_alpha1, reg_alpha2
                                 model_name = model+'_'+submodel
                                 t = time.time()                               
-                                run_models(datasetName,test, model_name,K,L,reg_beta,reg_alpha1, reg_alpha2,delta_convg = 1e-2,num_iter = 60,k_fold = 10,pctg_users= 100,pctg_movies = 100)  
+                                run_models(datasetName,test, model_name,K,L,reg_beta,reg_alpha1, reg_alpha2,delta_convg = 1e-4,num_iter = 100,k_fold = 10,pctg_users= 100,pctg_movies = 100)  
                                 elapsed = time.time() - t
                                 print 'ELAPSED TIME' + str(elapsed)
     

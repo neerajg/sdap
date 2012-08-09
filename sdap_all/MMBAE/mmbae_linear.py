@@ -37,11 +37,9 @@ def train_mmbae_linear(K, L, X1, X2, train_I, train_J, train_Y, reg_beta, num_it
     t = 0
     while em_convg == False and t < num_iter:
         # M-Step
-        print get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,gammas,r,train_I,train_J, train_Y,X_composite)        
         alphas, betas = m_step(K, L, X_composite, train_I, train_J, train_Y, alphas, betas, gammas, r, reg_beta, M, N, reg_alpha1, reg_alpha2)
-        print get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,gammas,r,train_I,train_J, train_Y,X_composite)
         # E - Step
-        #gammas, r = e_step(K, L, X_composite, train_I, train_J, train_Y, alphas, betas, gammas, r, M, N, num_iter,delta_convg)
+        gammas, r = e_step(K, L, X_composite, train_I, train_J, train_Y, alphas, betas, gammas, r, M, N, num_iter,delta_convg)
                 
         # Test for Convergence
         t +=1        
@@ -49,8 +47,8 @@ def train_mmbae_linear(K, L, X1, X2, train_I, train_J, train_Y, reg_beta, num_it
         delta_likelihood = log_likelihood[t]-log_likelihood[t-1]
         delta_likelihood = delta_likelihood*100/abs(log_likelihood[t-1])
         print delta_likelihood, t, log_likelihood[t]
-        if (delta_likelihood) < delta_convg:
-            em_convg = True
+        #if (delta_likelihood) < delta_convg:
+            #em_convg = True
         
     # Return whatever needs to be returned
     params = {'r':r,
@@ -86,19 +84,25 @@ def e_step(K, L, X_composite, train_I, train_J, train_Y, alphas, betas, gammas, 
 def update_gammas(gammas, alphas, r, betas, train_Y, train_I, train_J, K, L, M, N, X_composite):
     gamma1 = gammas[0]
     gamma2 = gammas[1]
-    
+    ones = np.ones((len(train_I),))
+    mu = sp.csr_matrix((ones, (train_I,train_J)), shape=(M,N)).sum(1)
+    mv = sp.csr_matrix((ones, (train_I,train_J)), shape=(M,N)).sum(0)
+    #mu[mu<1] = 1
+    #mv[mv<1] = 1
+    mu[:] = 1
+    mv[:] = 1
     gammas_new = [np.zeros(gamma1.shape),np.zeros(gamma2.shape)]
     temp1 = get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,gammas,r,train_I,train_J, train_Y,X_composite)
     for k in range(K):
-        gammas_new[0][:,k] = alphas[0][k] + np.array(sp.csr_matrix((r[0][:,k],(train_I,train_J)),shape=(M,N)).sum(1).flatten())[0] # M x K
-    temp2 = get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,gammas,r,train_I,train_J, train_Y,X_composite) 
+        gammas_new[0][:,k] = alphas[0][k] + np.array(np.divide(sp.csr_matrix((r[0][:,k],(train_I,train_J)),shape=(M,N)).sum(1),mu).flatten())[0] # M x K
+    temp2 = get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,[gammas_new[0],gammas[1]],r,train_I,train_J, train_Y,X_composite) 
     if temp1>=temp2:
         gammas_new[0] = gamma1
     
-    temp1 = get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,gammas,r,train_I,train_J, train_Y,X_composite)
+    temp1 = get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,[gammas_new[0],gammas[1]],r,train_I,train_J, train_Y,X_composite)
     for l in range(L):    
-        gammas_new[1][:,l] = alphas[1][l] + np.array(sp.csr_matrix((r[1][:,l],(train_I,train_J)),shape=(M,N)).sum(0).transpose().flatten())[0] # N x L    temp2 = get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,gammas,r,train_I,train_J, train_Y,X_composite)
-    temp2 = get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,gammas,r,train_I,train_J, train_Y,X_composite) 
+        gammas_new[1][:,l] = alphas[1][l] + np.array(np.divide(sp.csr_matrix((r[1][:,l],(train_I,train_J)),shape=(M,N)).sum(0),mv).transpose().flatten())[0] # N x L    temp2 = get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,gammas,r,train_I,train_J, train_Y,X_composite)
+    temp2 = get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,gammas_new,r,train_I,train_J, train_Y,X_composite) 
     if temp1>=temp2:
         gammas_new[1] = gamma2
     
@@ -123,8 +127,6 @@ def update_r(gammas, r, betas, train_Y, train_I, train_J, K, L, M, N, X_composit
     r2_new = np.zeros((r2.shape))
 
     Yobs = train_Y
-    temp1 = np.zeros((Yobs.shape[0],K))
-    temp2 = np.zeros((Yobs.shape[0],L))
     
     # r1,r2 update
     log_r1 += digamma(gamma1[train_I,:])# - digamma(np.sum(gamma1[P,:]))            
@@ -133,10 +135,11 @@ def update_r(gammas, r, betas, train_Y, train_I, train_J, K, L, M, N, X_composit
         # p(y|beta*x)
         for l in range(L):
             beta_times_x = np.dot(X,beta[k,l,:]) # (|Yobs| x 1)
-            r2_temp = r[1][:,l]        
-            log_r1[:,k] += (-.5*np.log(2*np.pi*sigmaY[k,l]) - (.5/(sigmaY[k,l]))*((Yobs- beta_times_x)**2) )* r2_temp
+            r2_temp = r[1][:,l]  
+            temp = (-.5*np.log(2*np.pi*sigmaY[k,l]) - (.5/(sigmaY[k,l]))*((Yobs- beta_times_x)**2) )      
+            log_r1[:,k] += temp* r2_temp
             r1_temp = r[0][:,k]
-            log_r2[:,l] += (-.5*np.log(2*np.pi*sigmaY[k,l]) - (.5/(sigmaY[k,l]))*((Yobs- beta_times_x)**2) )* r1_temp
+            log_r2[:,l] += temp* r1_temp
              
     # Prevent underflow by using a transformed method to get to normalized product space:
     # (e^x) / (e^x + e^y) = 1 / (1 + e^(y-x))
@@ -169,7 +172,7 @@ def update_r(gammas, r, betas, train_Y, train_I, train_J, K, L, M, N, X_composit
 ###################################################################################################################################
 def m_step(K, L, X_composite, train_I, train_J, train_Y, alphas, betas, gammas, r, reg_beta, M, N, reg_alpha1,reg_alpha2):
     Yobs = train_Y
-    #alphas = update_alphas(gammas, alphas, K, L, M, N, betas, r, train_I, train_J, train_Y, X_composite,reg_alpha1,reg_alpha2)
+    alphas = update_alphas(gammas, alphas, K, L, M, N, betas, r, train_I, train_J, train_Y, X_composite,reg_alpha1,reg_alpha2)
     betas = update_betas(Yobs, X_composite, r, betas, reg_beta, K, L, M, N, train_I, train_J)
     return alphas, betas
 
@@ -329,6 +332,8 @@ def get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,gammas,r,train_I,train_J
     # (sum over m(digamma(sum over k(gamma1mk))))*(sum over k(gamma1mk - 1))
     log_likelihood += np.dot(np.sum(gammas[0]-1,1),digamma_gamma1m)
     
+    log_likelihood -= np.sum(gammaln(np.sum(gammas[0],1)))
+    log_likelihood += np.sum(gammaln(gammas[0]))    
     
     ###############
     # H(q) Col terms
@@ -338,6 +343,8 @@ def get_log_likelihood_lower_bound(K,L,M,N,alphas,betas,gammas,r,train_I,train_J
     # (sum over n(digamma(sum over l(gamma2nl))))*(sum over l(gamma2nl - 1))
     log_likelihood += np.dot(np.sum(gammas[1]-1,1),digamma_gamma2n)
 
+    log_likelihood -= np.sum(gammaln(np.sum(gammas[1],1)))
+    log_likelihood += np.sum(gammaln(gammas[1]))
     
     ###############
     # H(q) Cross terms

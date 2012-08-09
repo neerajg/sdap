@@ -10,10 +10,12 @@ import sys, os
 sys.path.append(os.path.abspath('./SCOAL/'))
 sys.path.append(os.path.abspath('./BAE/'))
 sys.path.append(os.path.abspath('./MMBAE/'))
+sys.path.append(os.path.abspath('./MMBAE_CPLD/'))
 
 import run_scoal as scoal
 import run_bae as bae
 import run_mmbae as mmbae
+import run_mmbae_cpld as mmbae_cpld
 
 def runModelHotStart(model_name, K, L, X1, X2, train_I, train_J, train_Y, reg_lambda, num_iter, delta_convg, reg_alpha1 = None, reg_alpha2 = None):
     # Train the model and return the parameters and objective function
@@ -31,7 +33,11 @@ def runModelHotStart(model_name, K, L, X1, X2, train_I, train_J, train_Y, reg_la
         if model_name.split('_')[1].upper() == 'LINEAR':
             learner = 'linear'
             reg_beta = reg_lambda
-        train_op = mmbae.run_mmbae(K, L, X1, X2, train_I, train_J, train_Y, learner, reg_beta, num_iter, delta_convg, reg_alpha1, reg_alpha2)            
+            train_op = mmbae.run_mmbae(K, L, X1, X2, train_I, train_J, train_Y, learner, reg_beta, num_iter, delta_convg, reg_alpha1, reg_alpha2)
+        if model_name.split('_')[1].upper() == 'CPLD':
+            learner = 'linear'
+            reg_beta = reg_lambda
+            train_op = mmbae_cpld.run_mmbae_cpld(K, L, X1, X2, train_I, train_J, train_Y, learner, reg_beta, num_iter, delta_convg, reg_alpha1, reg_alpha2)                                    
 
     return train_op
 
@@ -60,6 +66,11 @@ def calcHotStartTrainRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, t
         hotStartTrainRMSE = scoal.hotStartTrainRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op)
     if model_name.upper().split('_')[0] == 'BAE':
         hotStartTrainRMSE = bae.hotStartTrainRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)
+    if model_name.upper().split('_')[0] == 'MMBAE':
+        if model_name.upper().split('_')[1] == 'CPLD':        
+            hotStartTrainRMSE = mmbae_cpld.hotStartTrainRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)
+        else:
+            hotStartTrainRMSE = mmbae.hotStartTrainRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)                
     return hotStartTrainRMSE
 
 def calcWarmStartTrainRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, train_op):
@@ -78,23 +89,25 @@ def calcColdStartTrainRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, 
 
 def calcHotStartValRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, train_op):
     # Predict the Training Set and return the Prediction RMSE
-    model_name = model_name.upper()
     if model_name.upper().split('_')[0] == 'SCOAL': 
         hotStartValRMSE = scoal.hotStartValRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op)
     if model_name.upper().split('_')[0] == 'BAE':
-        hotStartValRMSE = bae.hotStartValRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)        
+        hotStartValRMSE = bae.hotStartValRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)
+    if model_name.upper().split('_')[0] == 'MMBAE':
+        if model_name.upper().split('_')[1] == 'CPLD':
+            hotStartValRMSE = mmbae_cpld.hotStartValRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)
+        else:        
+            hotStartValRMSE = mmbae.hotStartValRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)
     return hotStartValRMSE
 
 def calcWarmStartValRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, train_op, centroids):
     # Predict the Training Set and return the Prediction RMSE
-    model_name = model_name.upper()
     if model_name.upper().split('_')[0] == 'SCOAL': 
         warmStartValRMSE = scoal.warmStartValRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op, centroids)
     return warmStartValRMSE
 
 def calcColdStartValRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, train_op, centroids):
     # Predict the Training Set and return the Prediction RMSE
-    model_name = model_name.upper()
     if model_name.upper().split('_')[0] == 'SCOAL': 
         coldStartValRMSE = scoal.coldStartValRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op, centroids)
     return coldStartValRMSE

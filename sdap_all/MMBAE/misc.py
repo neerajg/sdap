@@ -45,11 +45,16 @@ def init_params(K, L, M, N, X1, X2, no_obs, train_I, train_J):
     r2[r2<1e-6] = 1e-6
     #r2[r2>0.9] = 0.9    
     r = [r1,r2]
-
+    ones = np.ones((len(train_I),))
+    mu = sp.csr_matrix((ones, (train_I,train_J)), shape=(M,N)).sum(1)
+    mv = sp.csr_matrix((ones, (train_I,train_J)), shape=(M,N)).sum(0)
+    mu[mu<1] = 1
+    mv[mv<1] = 1
+    
     for k in range(K):
-        gammas[0][:,k] = np.array((np.tile(alphas[0][k], (M,1)) + sp.csr_matrix((r1[:,k],(train_I,train_J)),shape=(M,N)).sum(1)).flatten())[0] # M x K
+        gammas[0][:,k] = alphas[0][k] + np.array(np.divide(sp.csr_matrix((r1[:,k],(train_I,train_J)),shape=(M,N)).sum(1),mu).flatten())[0] # M x K
     for l in range(L):    
-        gammas[1][:,l] = np.array((np.tile(alphas[1][l], (N,1)) + sp.csr_matrix((r2[:,l],(train_I,train_J)),shape=(M,N)).sum(0).transpose()).flatten())[0] # N x L
+        gammas[1][:,l] = alphas[1][l] + np.array(np.divide(sp.csr_matrix((r2[:,l],(train_I,train_J)),shape=(M,N)).sum(0),mv).transpose().flatten())[0] # N x L
                   
     return alphas, gammas, betas, r
 
