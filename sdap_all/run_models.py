@@ -12,16 +12,10 @@ import getData as data
 import writeResults as op
 import run_model as runModel
 
-import os
-#sys.path.append(os.path.abspath('./BAE/'))
-#import bae_linear as bae_linear
-#import numpy as np
 from  analyzeRMSE import analyzeRMSE
 
 # TO DO : for now we are using hard assignment for the attribute clusters for the warm and cold start cases
 # Change this to soft assignment for better performance later on
-
-# TO DO : Right now we are only using linear models, change that to include others as well
 
 def run_models(datasetName,test, model_name,K,L,reg_lambda,reg_alpha1,reg_alpha2,delta_convg,num_iter,k_fold,pctg_users,pctg_movies,M = 2000, N = 10000, D1 = 3, D2 = 4, no_obs_mult = 0.04):
     print "START"
@@ -216,7 +210,7 @@ if __name__ == '__main__':
     for datasetName in datasets:
         for test in testcases:
             for model in models:
-                if model =='scoal':
+                if model =='scoal' or 'mf':
                     reg_alphas1 = [0]
                     reg_alphas2 = [0]
                 for submodel in submodels:

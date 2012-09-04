@@ -5,21 +5,19 @@ Author - Neeraj Gaur
 Title - Runs the appropriate model depending on the input string
 
 '''
-import sys, os
-
-sys.path.append(os.path.abspath('./SCOAL/'))
-sys.path.append(os.path.abspath('./BAE/'))
-sys.path.append(os.path.abspath('./MMBAE/'))
-sys.path.append(os.path.abspath('./MMBAE_CPLD/'))
-
-import run_scoal as scoal
-import run_bae as bae
-import run_mmbae as mmbae
-import run_mmbae_cpld as mmbae_cpld
+import sys
+import SCOAL.run_scoal as scoal
+import BAE.run_bae as bae
+import MMBAE.run_mmbae as mmbae
+import MMBAE_CPLD.run_mmbae_cpld as mmbae_cpld
+import MF.run_mf as mf
 
 def runModelHotStart(model_name, K, L, X1, X2, train_I, train_J, train_Y, reg_lambda, num_iter, delta_convg, reg_alpha1 = None, reg_alpha2 = None):
     # Train the model and return the parameters and objective function
     model = model_name.split('_')[0].upper()
+    if model == 'MF': 
+        sub_model = model_name.split('_')[1].upper()
+        train_op = mf.run_mf(K, L, X1, X2, train_I, train_J, train_Y, reg_lambda,sub_model)    
     if model == 'SCOAL':
         if model_name.split('_')[1].upper() == 'LINEAR':
             learner = 'ridge' 

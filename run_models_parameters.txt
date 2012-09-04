@@ -1,6 +1,6 @@
 test hotStart
-models bae
-submodels linear
+models mf
+submodels pmf
 datasets movielens
 K 2
 L 4

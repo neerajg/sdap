@@ -40,11 +40,11 @@ def analyzeRMSE():
                     shutil.rmtree(analyzed_dir)
                 os.mkdir(analyzed_dir)
                 results_files = os.listdir(testcase_dir)
-                for file in results_files:
-                    fs = file.split('_')                    
+                for file_current in results_files:
+                    fs = file_current.split('_')                    
                     if len(fs)<5:
                         continue
-                    file_name = testcase_dir + file
+                    file_name = testcase_dir + file_current
                     train_rmses = []
                     val_rmses = []
                     ifile = open(file_name,'r')
