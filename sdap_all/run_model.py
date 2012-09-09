@@ -10,6 +10,7 @@ import SCOAL.run_scoal as scoal
 import BAE.run_bae as bae
 import MMBAE.run_mmbae as mmbae
 import MMBAE_CPLD.run_mmbae_cpld as mmbae_cpld
+import AAMMBAE.run_aammbae as aammbae
 import MF.run_mf as mf
 
 def runModelHotStart(model_name, K, L, X1, X2, train_I, train_J, train_Y, reg_lambda, num_iter, delta_convg, reg_alpha1 = None, reg_alpha2 = None):
@@ -36,6 +37,11 @@ def runModelHotStart(model_name, K, L, X1, X2, train_I, train_J, train_Y, reg_la
             learner = 'linear'
             reg_beta = reg_lambda
             train_op = mmbae_cpld.run_mmbae_cpld(K, L, X1, X2, train_I, train_J, train_Y, learner, reg_beta, num_iter, delta_convg, reg_alpha1, reg_alpha2)                                    
+    if model == 'AAMMBAE':
+        if model_name.split('_')[1].upper() == 'LINEAR':
+            learner = 'linear'
+            reg_beta = reg_lambda
+            train_op = aammbae.run_aammbae(K, L, X1, X2, train_I, train_J, train_Y, learner, reg_beta, num_iter, delta_convg, reg_alpha1, reg_alpha2)                                    
 
     return train_op
 
@@ -68,7 +74,9 @@ def calcHotStartTrainRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, t
         if model_name.upper().split('_')[1] == 'CPLD':        
             hotStartTrainRMSE = mmbae_cpld.hotStartTrainRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)
         else:
-            hotStartTrainRMSE = mmbae.hotStartTrainRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)                
+            hotStartTrainRMSE = mmbae.hotStartTrainRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)
+    if model_name.upper().split('_')[0] == 'AAMMBAE':
+        hotStartTrainRMSE = aammbae.hotStartTrainRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)                       
     return hotStartTrainRMSE
 
 def calcWarmStartTrainRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, train_op):
@@ -96,6 +104,8 @@ def calcHotStartValRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, tra
             hotStartValRMSE = mmbae_cpld.hotStartValRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)
         else:        
             hotStartValRMSE = mmbae.hotStartValRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)
+    if model_name.upper().split('_')[0] == 'AAMMBAE':
+        hotStartValRMSE = aammbae.hotStartValRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)            
     return hotStartValRMSE
 
 def calcWarmStartValRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, train_op, centroids):

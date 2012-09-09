@@ -48,6 +48,7 @@ def train_pmf_test(M, N, train_I, train_J, train_Y):
 
 def update_rowFactors(train_Y,U,V,train_I,train_J,M,N,eta_init):
     for m in range(M):
+        print m
         error_ud = np.zeros(N,)
         temp_u = U[m,:]  
         
@@ -83,6 +84,7 @@ def update_rowFactors(train_Y,U,V,train_I,train_J,M,N,eta_init):
 
 def update_colFactors(train_Y,U,V,train_I,train_J,M,N,eta_init):
     for n in range(N):
+        print n
         error_vd = np.zeros(M,)
         temp_v = V[n,:]  
         
@@ -125,40 +127,4 @@ def initialize(M,N,D):
     V = np.random.randn(N,D)
     return U,V
 
-def kpmf(R, U, V, D, w_nm, Su, Sv, num_obs, threshold, iters, eta, beta, sigma_sqrd):
-    old_e = 1e99
-    for step in xrange(iters):
-        e_nm = R.toarray() - np.dot(U,V.T)
-        t_nm = w_nm.toarray()*e_nm # N x M
-        tempu = np.zeros((w_nm.shape[0],D)) # N x D
-        tempv = np.zeros((w_nm.shape[1],D)) # M x D
-        # TO DO : Optimize to remove this loop and vectorize this too
-        # U - N x D
-        # V - M x D
-        for d in range(D):
-            v_md = np.tile(V[:,d],w_nm.shape[0]).reshape([w_nm.shape[0],w_nm.shape[1]]) # N x M
-            u_nd = np.tile(U[:,d],w_nm.shape[1]).reshape([w_nm.shape[1],w_nm.shape[0]]).T  # N x M
 
-            tempu_nd = np.sum(t_nm*v_md,1).reshape(w_nm.shape[0],1) # N x 1
-            tempv_md = np.sum(t_nm*u_nd,0).reshape(w_nm.shape[1],1) # M x 1
-
-            tempu[:,d] = tempu_nd.reshape(w_nm.shape[0],)
-            tempv[:,d] = tempv_md.reshape(w_nm.shape[1],)
-
-        grad_U_nd = np.dot(Su,U)  - (1/sigma_sqrd)*tempu # N x D
-        grad_V_md = np.dot(Sv,V)  - (1/sigma_sqrd)*tempv # M x D
-
-        U = U - eta * grad_U_nd
-        V = V - eta * grad_V_md
-        
-        # Calculate change in Objective function
-        e = w_nm.toarray()*(R.toarray() - np.dot(U,V.T))
-        e = np.sqrt(np.sum(e*e)/num_obs)
-        diff = old_e - e
-        
-        #print diff
-        
-        old_e = e
-        if diff < threshold:
-            break
-    return U, V

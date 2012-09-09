@@ -30,9 +30,11 @@ def run_models(datasetName,test, model_name,K,L,reg_lambda,reg_alpha1,reg_alpha2
     trctd_X2 = dataSet['trctd_X2']
     
     model_results = op.makeDir(model_name, datasetName)
+    set_folds = [3,4,5,6,7,8,9]
             
     if test == 'all' or test == 'hotStart':
-        for fold in range(k_fold):            
+        for fold in set_folds:
+        #for fold in range(k_fold):            
             # Get Data Folds
             hotStartDataFold = data.getHotStartDataFolds(fold, dataSet)
             train_I = hotStartDataFold['train_I']
@@ -210,17 +212,16 @@ if __name__ == '__main__':
     for datasetName in datasets:
         for test in testcases:
             for model in models:
-                if model =='scoal' or 'mf':
+                if model =='scoal' or model == 'mf':
                     reg_alphas1 = [0]
                     reg_alphas2 = [0]
                 for submodel in submodels:
                     for reg_beta in reg_betas:
                         for reg_alpha1 in reg_alphas1:
                             for reg_alpha2 in reg_alphas2:
-                                print reg_alpha1, reg_alpha2
                                 model_name = model+'_'+submodel
                                 t = time.time()                               
-                                run_models(datasetName,test, model_name,K,L,reg_beta,reg_alpha1, reg_alpha2,delta_convg = 1e-4,num_iter = 100,k_fold = 10,pctg_users= 100,pctg_movies = 100)  
+                                run_models(datasetName,test, model_name,K,L,reg_beta,reg_alpha1, reg_alpha2,delta_convg = 1e-4,num_iter = 40,k_fold = 10,pctg_users= 100,pctg_movies = 100)  
                                 elapsed = time.time() - t
                                 print 'ELAPSED TIME' + str(elapsed)
     

@@ -23,8 +23,8 @@ def initialize(X1, X2, train_I, train_J, train_Y, K, L):
     X_composite = np.hstack((Xbias, Xusers, Xitems)) # |Yobs| x (1 + D1 + D2)
     
     # Initialize alphas, betas, r and gammas
-    alphas, gammas, betas, r, s = init_params(K, L, M, N, X1, X2, no_obs, train_I, train_J)
-    return alphas, gammas, betas, r, X_composite, M, N
+    alphas, gammas, betas, thetas, r, s = init_params(K, L, M, N, X1, X2, no_obs, train_I, train_J)
+    return alphas, gammas, betas, thetas, r, s, X_composite, M, N
 
 def init_params(K, L, M, N, X1, X2, no_obs, train_I, train_J):
     # TO DO : need a way to make initialization of sigma in such a way that in the beginning not too much of r gets even out because of this or gets neglected
@@ -36,8 +36,16 @@ def init_params(K, L, M, N, X1, X2, no_obs, train_I, train_J):
     beta_shape = (K,L,1 + X1.shape[1] + X2.shape[1])
     sigmaY_shape = (K,L)
     #randint(low = -1, high = 1, size = beta_shape) + 
-    betas = [random(beta_shape), randint(low = 10, high = 50, size = sigmaY_shape) + random(sigmaY_shape)]  
-    
+    betas = [random(beta_shape), randint(low = 10, high = 50, size = sigmaY_shape) + random(sigmaY_shape)]
+      
+    m1 = np.zeros((K,X1.shape[1])) + random((K,X1.shape[1]))
+    m2 = np.zeros((L,X2.shape[1])) + random((L,X2.shape[1]))
+    sigma1 = np.zeros((K,X1.shape[1])) + random((K,X1.shape[1]))
+    sigma2 = np.zeros((L,X2.shape[1])) + random((L,X2.shape[1]))
+    theta1 = [m1,sigma1]
+    theta2 = [m2,sigma2]
+    thetas = [theta1,theta2]
+        
     r1 = dirichlet(alphas[0], M)
     r1[r1<1e-4] = 1e-4
     #r1[r1>0.99] = 0.9
@@ -57,12 +65,12 @@ def init_params(K, L, M, N, X1, X2, no_obs, train_I, train_J):
     s2 = dirichlet(alphas[1], N)
     s2[s2<1e-6] = 1e-6
     #r2[r2>0.9] = 0.9    
-    s = [s1,s2]    
+    s = [s1,s2]     
     
     gammas[0] = np.tile(alphas[0].reshape(1,K), (M,1)) + s[0] + np.multiply(r[0],mu) # M x K
     gammas[1] = np.tile(alphas[1].reshape(1,L), (N,1)) + s[1] + np.multiply(r[1],mv) # N x L
                   
-    return alphas, gammas, betas, r, s
+    return alphas, gammas, betas, thetas, r, s
 
 """ Helper Function to build the objective function to be maximized for updating the
 alphas. Code built using the notations for alpha1, works for alpha2 too since
