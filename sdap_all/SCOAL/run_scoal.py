@@ -10,18 +10,22 @@ import scipy.sparse as sp
 from learn_scoal import learn_scoal
 from scipy.cluster.vq import whiten, vq
 import sys
+import SCOAL.general_scoal_model as scoal
 
 convergence_threshold = 1e-6
 
 def run_scoal(K, L, X1, X2, train_I, train_J, train_Y, learner, reg_lambda):
     
     # Preliminaries
-    subclass_module = 'general_scoal_model'
-    subclass_parts = map(lambda x: x.capitalize(), subclass_module.split('_'))
-    subclass = ''.join(subclass_parts)
-    learner = 'ridge'
-    model_module = __import__(subclass_module)
-    model = eval('model_module.%s()' % (subclass,))
+    #subclass_module = 'SCOAL.general_scoal_model'
+    #split_module = subclass_module.split('.')[1]
+    #subclass_parts = map(lambda x: x.capitalize(), split_module.split('_'))
+    #subclass = ''.join(subclass_parts)
+    #learner = 'ridge'
+    #model_module = __import__(subclass_module)
+    #smodel = eval('model_module.%s()' % (subclass,))
+    
+    model = scoal.GeneralScoalModel()
 
     Xs = [0,0]   
     Xs[0] = X1

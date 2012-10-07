@@ -1,22 +1,26 @@
 '''
-Created on Jul 25, 2012
+Created on Oct 5, 2012
 
 @author: neeraj
 '''
-import xlwt
-from datetime import datetime
+import glob
+import sys
+import os
+import scipy.io.mmio as mm
+import numpy as np
 
-style0 = xlwt.easyxf('font: name Times New Roman, color-index red, bold on',
-    num_format_str='#,##0.00')
-style1 = xlwt.easyxf(num_format_str='D-MMM-YY')
+def main():
+    files = glob.iglob(os.path.join('D:\\sdap\\data\\temp\\','*.U'))
+    t = 0
+    for file_name in sorted(files):
+        if t == 0:
+            a = np.loadtxt(file_name,skiprows=3)
+            t = 1
+        else:
+            b = np.loadtxt(file_name,skiprows=3)
+            a = np.vstack((a,b))
+    return
 
-wb = xlwt.Workbook()
-ws = wb.add_sheet('A Test Sheet')
-
-ws.write(0, 0, 1234.56, style0)
-ws.write(1, 0, datetime.now(), style1)
-ws.write(2, 0, 1)
-ws.write(2, 1, 1)
-ws.write(2, 2, xlwt.Formula("A3+B3"))
-
-wb.save('D:/example.xls')
+if __name__ == '__main__':
+    main()
+    sys.exit()

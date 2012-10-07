@@ -138,7 +138,7 @@ def getRatingsTestData(k_fold, pctg_users, pctg_movies, K, L, datasetName,M=None
                 'params':params
                 }
         
-        ofile = open(ratings_test_data_file, "w")
+        ofile = open(ratings_test_data_file, "wb")
         pickle.dump(data, ofile)
         ofile.close()  
         print"  DONE PREPARING REDUCED DATA"
@@ -165,7 +165,7 @@ def getRatingsTestData(k_fold, pctg_users, pctg_movies, K, L, datasetName,M=None
         print"  CLUSTERING THE USER ATTRIBUTES FOR WARM AND COLD START"
         # Whiten the features and use k-means to cluster the users
         user_centroids = kmeans(whiten(trctd_X1),K)[0]
-        ofile = open(user_clusters_data_file, "w")
+        ofile = open(user_clusters_data_file, "wb")
         pickle.dump(user_centroids, ofile)
         ofile.close()
         
@@ -182,7 +182,7 @@ def getRatingsTestData(k_fold, pctg_users, pctg_movies, K, L, datasetName,M=None
         print"  CLUSTERING THE MOVIE ATTRIBUTES FOR WARM AND COLD START"
         # Whiten the features and use k-means to cluster the users
         movie_centroids = kmeans(whiten(trctd_X2),L)[0]
-        ofile = open(movie_clusters_data_file, "w")
+        ofile = open(movie_clusters_data_file, "wb")
         pickle.dump(movie_centroids, ofile)
         ofile.close()        
        

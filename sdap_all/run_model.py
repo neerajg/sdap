@@ -16,7 +16,7 @@ import MF.run_mf as mf
 def runModelHotStart(model_name, K, L, X1, X2, train_I, train_J, train_Y, reg_lambda, num_iter, delta_convg, reg_alpha1 = None, reg_alpha2 = None):
     # Train the model and return the parameters and objective function
     model = model_name.split('_')[0].upper()
-    if model == 'MF': 
+    if model == 'MFSCOALNAMSTYLE': 
         sub_model = model_name.split('_')[1].upper()
         train_op = mf.run_mf(K, L, X1, X2, train_I, train_J, train_Y, reg_lambda,sub_model)    
     if model == 'SCOAL':
@@ -64,6 +64,7 @@ def runModelColdStart(model_name, K, L, X1, X2, train_I, train_J, train_Y, reg_l
     return train_op
 
 def calcHotStartTrainRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, train_op):
+    #print "BEFORE TRAIN RMSE"
     # Predict the Training Set and return the Prediction RMSE
     model_name = model_name.upper()
     if model_name.upper().split('_')[0] == 'SCOAL': 
@@ -76,7 +77,10 @@ def calcHotStartTrainRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, t
         else:
             hotStartTrainRMSE = mmbae.hotStartTrainRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)
     if model_name.upper().split('_')[0] == 'AAMMBAE':
-        hotStartTrainRMSE = aammbae.hotStartTrainRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)                       
+        hotStartTrainRMSE = aammbae.hotStartTrainRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)  
+    if model_name.upper().split('_')[0] == 'MFSCOALNAMSTYLE':
+        hotStartTrainRMSE = mf.hotStartTrainRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)
+    #print "AFTER TRAIN RMSE"        
     return hotStartTrainRMSE
 
 def calcWarmStartTrainRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, train_op):
@@ -105,7 +109,11 @@ def calcHotStartValRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, tra
         else:        
             hotStartValRMSE = mmbae.hotStartValRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)
     if model_name.upper().split('_')[0] == 'AAMMBAE':
-        hotStartValRMSE = aammbae.hotStartValRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)            
+        hotStartValRMSE = aammbae.hotStartValRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op) 
+    if model_name.upper().split('_')[0] == 'MFSCOALNAMSTYLE':
+        #print "BEFORE VAL RMSE"        
+        hotStartValRMSE = mf.hotStartValRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)
+    #print "AFTER VAL RMSE"        
     return hotStartValRMSE
 
 def calcWarmStartValRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, train_op, centroids):
