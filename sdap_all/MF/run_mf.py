@@ -4,7 +4,7 @@ Created on Jun 15, 2012
 Author - Neeraj Gaur
 '''
 
-from mf_scoalnamstyle import train_mfscoalnamstyle_graphlab
+from mf_scoalnamstyle import train_mfscoalnamstyle
 from mfscoalnamstyle_predict import mfscoalnamstyle_predict
 import scipy.sparse as sp
 import numpy as np
@@ -13,8 +13,11 @@ def run_mf(K, L, X1, X2, train_I, train_J, train_Y, reg_lambda, sub_model):
     M = X1.shape[0]
     N = X2.shape[0]
     if sub_model == 'ALS':
-        params, obj = train_mfscoalnamstyle_graphlab(M, N, train_I, train_J, train_Y, K, L,reg_lambda)
-
+        implementation = 'graphlab/ALS'
+        params, obj = train_mfscoalnamstyle(M, N, train_I, train_J, train_Y, K, L,reg_lambda,implementation)
+    if sub_model == 'SELFPMF':
+        implementation = 'self/PMF'
+        params, obj = train_mfscoalnamstyle(M, N, train_I, train_J, train_Y, K, L,reg_lambda,implementation)
     train_op = {'params':params,
                 'obj':obj
                 }

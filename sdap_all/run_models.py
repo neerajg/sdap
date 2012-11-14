@@ -37,7 +37,6 @@ def run_models(datasetName,test, model_name,K,L,reg_lambda,reg_alpha1,reg_alpha2
         for fold in set_folds:
         #for fold in range(k_fold):            
             # Get Data Folds
-            gc.collect()
             hotStartDataFold = data.getHotStartDataFolds(fold, dataSet)
             train_I = hotStartDataFold['train_I']
             train_J = hotStartDataFold['train_J']
@@ -60,8 +59,6 @@ def run_models(datasetName,test, model_name,K,L,reg_lambda,reg_alpha1,reg_alpha2
             train_op = runModel.runModelHotStart(model_name, K, L, trctd_X1, trctd_X2, train_I, train_J, train_Y, reg_lambda, num_iter, delta_convg, reg_alpha1,reg_alpha2,)
             
             print "  DONE TRAINING "+model_name+" FOR FOLD "+str(fold+1) 
-            gc.collect()
-            del hotStartDataFold
             
             # Calculate Hot Start Training RMSE
             hotStartTrainRMSE = runModel.calcHotStartTrainRMSE(model_name, K, L, trctd_X1, trctd_X2, train_I, train_J, train_Y, train_op)
@@ -69,8 +66,8 @@ def run_models(datasetName,test, model_name,K,L,reg_lambda,reg_alpha1,reg_alpha2
         
             # Calculate Hot Start Validation Set RMSE
             hotStartValRMSE = runModel.calcHotStartValRMSE(model_name, K, L, trctd_X1, trctd_X2, val_I, val_J, val_Y, train_op)
+            print hotStartValRMSE, hotStartTrainRMSE
             op.writeHotStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, hotStartValRMSE, 'val_'+str(fold), len(val_Y), reg_beta,  reg_alpha1, reg_alpha2)
-            del train_op
         
     if test == 'all' or test == 'warmStart':
         for fold in range(k_fold):      
@@ -218,15 +215,17 @@ if __name__ == '__main__':
     for i in range(len(Ks)):
         K = Ks[i]
         L = Ls[i]
-        if K == L and L == 1:
-            reg_alphas1 = [0]
-            reg_alphas2 = [0]
+        #if K == L and L == 1:
+            #reg_alphas1 = [0]
+            #reg_alphas2 = [0]
         for datasetName in datasets:
             for test in testcases:
                 for model in models:
                     if model =='scoal' or model == 'mf' or model == 'MFSCOALNAMSTYLE':
                         reg_alphas1 = [0]
                         reg_alphas2 = [0]
+                    if model == 'HYBRID':
+                        reg_beta = [0]
                     for submodel in submodels:
                         for reg_beta in reg_betas:
                             for reg_alpha1 in reg_alphas1:
@@ -234,7 +233,7 @@ if __name__ == '__main__':
                                     if model.upper() == 'SCOAL' and submodel.upper() == 'ALS':
                                         continue
                                     if model.upper() == 'MFSCOALNAMSTYLE' and submodel.upper() == 'LINEAR':
-                                        continue                                    
+                                        continue                              
                                     model_name = model+'_'+submodel
                                     t = time.time()                               
                                     run_models(datasetName,test, model_name,K,L,reg_beta,reg_alpha1, reg_alpha2,delta_convg = 1e-4,num_iter = 40,k_fold = 10,pctg_users= 100,pctg_movies = 100)  

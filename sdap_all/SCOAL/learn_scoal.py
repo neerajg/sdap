@@ -195,6 +195,7 @@ def learn_scoal(model, Z, W, K, L, learner, param, train_loss, test_loss, initia
             break
         old_objective = model.objective
         obj.append(old_objective)
+        print old_objective
     if __debug__:
         print "Final objective value: %f" % (model.objective,)
     return obj

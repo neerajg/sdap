@@ -12,10 +12,17 @@ import MMBAE.run_mmbae as mmbae
 import MMBAE_CPLD.run_mmbae_cpld as mmbae_cpld
 import AAMMBAE.run_aammbae as aammbae
 import MF.run_mf as mf
+import HYBRID.run_hybrid as hybrid
 
 def runModelHotStart(model_name, K, L, X1, X2, train_I, train_J, train_Y, reg_lambda, num_iter, delta_convg, reg_alpha1 = None, reg_alpha2 = None):
     # Train the model and return the parameters and objective function
     model = model_name.split('_')[0].upper()
+    if model == 'HYBRID':
+        model_1 = model_name.split('_')[1].upper()
+        model_2 = model_name.split('_')[2].upper()
+        reg_1 = reg_alpha1
+        reg_2 = reg_alpha2
+        train_op = hybrid.run_hybrid(K, L, X1, X2, train_I, train_J, train_Y, reg_1, reg_2, model_1, model_2)
     if model == 'MFSCOALNAMSTYLE': 
         sub_model = model_name.split('_')[1].upper()
         train_op = mf.run_mf(K, L, X1, X2, train_I, train_J, train_Y, reg_lambda,sub_model)    
@@ -80,6 +87,10 @@ def calcHotStartTrainRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, t
         hotStartTrainRMSE = aammbae.hotStartTrainRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)  
     if model_name.upper().split('_')[0] == 'MFSCOALNAMSTYLE':
         hotStartTrainRMSE = mf.hotStartTrainRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)
+    if model_name.upper().split('_')[0] == 'HYBRID':
+        model_1 = model_name.split('_')[1].upper()
+        model_2 = model_name.split('_')[2].upper()
+        hotStartTrainRMSE = hybrid.hotStartTrainRMSE(model_1,model_2,K, L, X1, X2, train_I, train_J, train_Y, train_op)
     #print "AFTER TRAIN RMSE"        
     return hotStartTrainRMSE
 
@@ -113,6 +124,10 @@ def calcHotStartValRMSE(model_name, K, L, X1, X2, train_I, train_J, train_Y, tra
     if model_name.upper().split('_')[0] == 'MFSCOALNAMSTYLE':
         #print "BEFORE VAL RMSE"        
         hotStartValRMSE = mf.hotStartValRMSE(model_name,K, L, X1, X2, train_I, train_J, train_Y, train_op)
+    if model_name.upper().split('_')[0] == 'HYBRID':
+        model_1 = model_name.split('_')[1].upper()
+        model_2 = model_name.split('_')[2].upper()  
+        hotStartValRMSE = hybrid.hotStartValRMSE(model_1,model_2,K, L, X1, X2, train_I, train_J, train_Y, train_op)
     #print "AFTER VAL RMSE"        
     return hotStartValRMSE
 
