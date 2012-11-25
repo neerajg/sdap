@@ -5,7 +5,6 @@ Created on Oct 5, 2012
 '''
 
 import numpy as np
-import PMF_self
 import scipy.sparse as sp
 import scipy.io.mmio as mm
 import glob, shutil, os, platform
@@ -31,10 +30,9 @@ class MFModel(object):
         self.J = train_J
         self.num_observations = len(train_Y)
         self.lambda_reg = lambda_reg
-        self.D = D
         return
     
-    def train(self,implementation):
+    def train(self):
         total_sqrd_error = 0.0
         # For Each Co-cluster
         for r in range(self.K):
@@ -65,7 +63,7 @@ class MFModel(object):
                 cols = np.array(list(set(filtered_J)))       
                 
                 # Call the MF for rows and cols of current co-cluster
-                self.matrixFactorization(rows,cols,r,c,implementation)
+                self.matrixFactorization(rows,cols,r,c)
                 total_sqrd_error += self.calculateSqrdError(filtered_Y,filtered_I,filtered_J,r,c)
         
         # Update the objective
@@ -172,30 +170,7 @@ class MFModel(object):
             self.C[j] = [int(np.argmin(error_L))]
         return
         
-    def matrixFactorization(self,rows,cols,r,c,implementation):
-        if implementation.split('/')[0].upper()=='GRAPHLAB':
-            algo = implementation.split('/')[1].upper() 
-            U,V = self.matrixFactorization_graphlab(rows,cols,r,c,algo)
-        if implementation.split('/')[0].upper()=='SELF':
-            algo = implementation.split('/')[1].upper() 
-            U,V = self.matrixFactorization_self(rows,cols,r,c,algo)            
-        # Update the Latent Factors in the model
-        self.U[rows,:,c] = U
-        self.V[cols,:,r] = V
-          
-        return
-
-    def matrixFactorization_self(self,rows,cols,r,c,algo):
-        # Pull out the sparse sub-matrix for current co-cluster
-        #print r,c
-        Y_sparse = self.coo_submatrix_pull(rows,cols)
-        rows,cols,vals = sp.find(Y_sparse)
-
-        # call Sanmi code
-        U,V = PMF_self.mf_solver(rows, cols, vals, self.D, self.lambda_reg,Y_sparse.shape[0],Y_sparse.shape[1])
-        return U,V
-    
-    def matrixFactorization_graphlab(self,rows,cols,r,c,algo):
+    def matrixFactorization(self,rows,cols,r,c):
         if platform.system() == 'Windows':
             base_dir = 'D:'
         elif platform.system() == 'Linux':
@@ -216,7 +191,7 @@ class MFModel(object):
         mm.mmwrite(Y_mm_file,Y_sparse,comment="")
         
         # Call Matrix Factorization code
-        cmd = "~/graphlabapi/release/demoapps/pmf/pmf "+ Y_mm_file_name +" --matrixmarket=true --D="+str(self.D)+" --lambda="+str(self.lambda_reg)+" --minval=0.5 --maxval=5.0 --ncpus=16 --max_iter=50 --threshold=1e-6"
+        cmd = "~/graphlabapi/release/demoapps/pmf/pmf "+ Y_mm_file_name +" --matrixmarket=true --lambda="+str(self.lambda_reg)+" --minval=0.5 --maxval=5.0 --ncpus=16 --max_iter=35 --threshold=1e-6"
         subprocess.call(cmd,shell=True)#,stdout=subprocess.PIPE,stderr=subprocess.STDOUT) #TO DO replace 
         #os.system(cmd)
     
@@ -227,8 +202,12 @@ class MFModel(object):
         #import sys
         #sys.exit()
         
-        return U,V        
-    
+        # Update the Latent Factors in the model
+        self.U[rows,:,c] = U
+        self.V[cols,:,r] = V
+          
+        return
+
     def coo_submatrix_pull(self,rows,cols):
         """
         Pull out an arbitrary i.e. non-contiguous submatrix out of
