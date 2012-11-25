@@ -12,9 +12,7 @@ from scipy.cluster.vq import whiten, vq
 import sys
 import SCOAL.general_scoal_model as scoal
 
-convergence_threshold = 1e-6
-
-def run_scoal(K, L, X1, X2, train_I, train_J, train_Y, learner, reg_lambda):
+def run_ssScoal(K, L, X1, X2, train_I, train_J, train_Y, learner,num_iter,delta_convg,sub_model,reg_op,reg_ss,semi_sup_learner):
     
     model = scoal.GeneralScoalModel()
 
@@ -32,7 +30,7 @@ def run_scoal(K, L, X1, X2, train_I, train_J, train_Y, learner, reg_lambda):
     rowAttr = Xs[0]
     colAttr = Xs[1]
     model.set_attributes(rowAttr, colAttr, crossAttr=None)
-    obj = learn_scoal(model, Z, train_W, K, L, learner, reg_lambda,None,None, initial_R=None, initial_C=None)
+    obj = learn_scoal(model, Z, train_W, K, L, learner,num_iter,delta_convg,reg_op_learner=reg_op,ss_learner=semi_sup_learner,reg_ss_model=reg_ss,semi_supervised=True)
     parameters = np.zeros((K,L,rowAttr.shape[1] + colAttr.shape[1]))
     for k in range(K):
         for l in range(L):

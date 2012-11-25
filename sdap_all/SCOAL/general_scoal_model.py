@@ -44,13 +44,14 @@ class GeneralScoalModel(object):
             else:
                 self.crossAttr = crossAttr
 
-    def initialize(self, Z, W, M, N, initial_R, initial_C,K,L):
+    def initialize(self, Z, W, M, N, initial_R, initial_C,K,L,semi_supervised):
         self.R = initial_R
         self.C = initial_C
         self.M = M
         self.N = N
         self.K = K
         self.L = L
+        self.semi_supervised = semi_supervised
         
         ###############################################################
         # Initialize Data
@@ -85,8 +86,9 @@ class GeneralScoalModel(object):
         self.cold_start_cols[bin_count_cols>0] = 0
         
     def init_learner(self, learner=None, params={'alpha':0.1}, train_loss=None, test_loss=None):
+        
         ###############################################################
-        # Setup co-cluster learning models
+        # Setup Output learning models
         ###############################################################
         if learner is None: # uses scikits.learn internal bias
             if self.D>0:
@@ -104,6 +106,17 @@ class GeneralScoalModel(object):
             test_loss = "mse"
         self.train_loss = train_loss_dict[train_loss]
         self.test_loss = test_loss_dict[test_loss]
+
+    def init_ss_learner(self, learner=None, params={'alpha':0.1}):
+        
+        ###############################################################
+        # Setup semi-supervised co-cluster learning models
+        ###############################################################
+        self.ss_models = np.empty((2, 1), dtype = 'object') # For Dyadic data
+        self.cumsum_log_prob = np.zeros((2,1))
+        self.log_prob_ss = [np.empty((self.M,self.K)),np.empty((self.N,self.L))]
+        for i in range(2):
+            self.ss_models[i] = learner_class(learner, params)
         
     def build_covariates(self, filtered_I, filtered_J):
         # Extract and Normalize covariates
@@ -132,6 +145,24 @@ class GeneralScoalModel(object):
                     self.models[r,c].fit(covariates, filtered_Z)
                     total_error += self.train_loss(filtered_Z, self.models[r,c].predict(covariates)).sum()
                     del covariates
+        
+        # Train the Semi_supervised co-clustering model
+        if self.semi_supervised:
+            for i in range(2):
+                if i == 0:
+                    target = self.R
+                    number = self.M
+                    training_vector = np.hstack((self.rowAttr,np.ones((self.M,1))))
+                else:
+                    target = self.C
+                    number = self.N
+                    training_vector = np.hstack((self.colAttr,np.ones((self.N,1))))
+                
+                # Train the semi-supervised co-clustering model
+                self.ss_models[i].fit(training_vector, target)
+                self.log_prob_ss[i] = - self.ss_models[i].predict_log_proba(training_vector)
+                self.cumsum_log_prob[i] = [self.log_prob_ss[i][j,self.R[j]] for j in range(number)]
+                total_error += self.cumsum_log_prob[i]
 
         self.objective = total_error / self.num_observations
 
@@ -141,7 +172,10 @@ class GeneralScoalModel(object):
         return
 
     def update_row_assignments(self):
-        errors = np.zeros((self.M, self.K))
+        if not self.semi_supervised:
+            errors = np.zeros((self.M, self.K))
+        else:
+            errors = self.cumsum_log_prob[1] + self.log_prob_ss[0]
         row_errors = np.zeros(self.M)
         
         for c in range(self.L):
@@ -177,7 +211,10 @@ class GeneralScoalModel(object):
             print "Objective after update_row_assignments: %f" % (self.objective,)
 
     def update_col_assignments(self):
-        errors = np.zeros((self.N, self.L))
+        if not self.semi_supervised:
+            errors = np.zeros((self.N, self.L))
+        else:
+            errors = self.cumsum_log_prob[0] + self.log_prob_ss[1]        
         col_errors = np.zeros(self.N)
         for r in range(self.K):
             # Filter out irrelevant rows
@@ -224,45 +261,4 @@ class GeneralScoalModel(object):
                     total_predictions = np.concatenate((total_predictions, current_predictions))
         predictions = sp.coo_matrix((total_predictions, (total_I, total_J)), shape=(self.M, self.N)).tocsr()
         prediction_list = np.array(predictions[I,J]).ravel()
-        # These next 4 lines are specific to the Yahoo! Music KDD Cup dataset
-        #prediction_list[prediction_list<0] = 0.0
-        #prediction_list[prediction_list>100] = 100.0
-        #assert np.any(prediction_list<0) == False
-        #assert np.any(prediction_list>100) == False
         return prediction_list
-
-    def save(self, filename):
-        self.I = None
-        self.J = None
-        self.Z = None
-        outfile = open(filename, 'wb')
-        pickle.dump(self, outfile, protocol=2)
-        outfile.close()
-
-    def load(self, filename):
-        infile = open(filename, 'rb')
-        new_self = pickle.load(infile)
-        infile.close()
-        return new_self
-                
-    def copy(self):
-        new_model = GeneralScoalModel()
-        new_model.rowAttr = self.rowAttr
-        new_model.colAttr = self.colAttr
-        new_model.crossAttr = self.crossAttr
-        new_model.objective = self.objective
-        new_model.C = self.C
-        new_model.R = self.R
-        new_model.K = self.K
-        new_model.L = self.L
-        new_model.models = self.models
-        new_model.train_loss = self.train_loss
-        new_model.test_loss = self.test_loss
-        new_model.Z = self.Z
-        new_model.I = self.I
-        new_model.J = self.J
-        new_model.flat_index = self.flat_index
-        new_model.M = self.M
-        new_model.N = self.N
-        new_model.D = self.D
-        return new_model

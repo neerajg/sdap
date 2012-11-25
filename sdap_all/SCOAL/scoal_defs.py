@@ -1,6 +1,6 @@
-from scikits.learn import linear_model
-from scikits.learn import metrics
-from scikits.learn import svm
+from scikit.learn import linear_model
+from scikit.learn import metrics
+from scikit.learn import svm
 from numexpr import evaluate
 import numpy as np
 
@@ -148,7 +148,7 @@ test_loss_dict = {"mse":mse,
                   "nf2":f2_score}
 
 # Constant definitions
-convergence_threshold = 1e-6
+#convergence_threshold = 1e-6
 maxIterations = 50 # maximum number of splits allowed
 
 # default options

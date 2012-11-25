@@ -31,10 +31,10 @@ def makeDir(model_name, datasetName):
     return model_results
 
 def writeHotStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, rmse, data_set, length, reg_beta,  reg_alpha1, reg_alpha2):
-    print "BEFORE WRITING RESULTS"
+    #print "BEFORE WRITING RESULTS"
     results_dir = model_results + 'hotStart/'
     writeRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, rmse, data_set, length, results_dir, reg_beta,  reg_alpha1, reg_alpha2)
-    print "AFTER WRITING RESULTS"    
+    #print "AFTER WRITING RESULTS"    
     return
 
 def writeWarmStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, rmse, data_set, length):

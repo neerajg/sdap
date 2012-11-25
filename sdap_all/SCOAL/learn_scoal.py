@@ -21,7 +21,7 @@ from general_scoal_model import GeneralScoalModel
 from collections import defaultdict
 from operator import itemgetter
 
-from scoal_defs import convergence_threshold, maxIterations, default_cv, \
+from scoal_defs import maxIterations, default_cv, \
         default_K, default_L, default_param_list, default_indir, default_model_filename
 
 def validSets(N, k):
@@ -172,7 +172,11 @@ def learn_scoal_wrapper(**argv):
     #learn_scoal(model, Z, W, K, L, learner, param, train_loss, test_loss)
     model.save(model_filename)
 
-def learn_scoal(model, Z, W, K, L, learner, param, train_loss, test_loss, initial_R=None, initial_C=None):
+def learn_scoal(model, Z, W, K, L, learner,num_iter=100,
+                delta_convg = 1e-6, reg_op_learner = None, 
+                train_loss = None, test_loss = None,
+                ss_learner = None,reg_ss_model = None, 
+                semi_supervised=False, initial_R=None, initial_C=None):
     M,N = W.shape
     obj = []
     old_objective = model.objective
@@ -180,21 +184,30 @@ def learn_scoal(model, Z, W, K, L, learner, param, train_loss, test_loss, initia
         initial_R = random.randint(0, K, size=Z.shape[0])
     if initial_C is None:
         initial_C = random.randint(0, L, size=Z.shape[1])
-    model.initialize(Z, W, M, N, initial_R, initial_C,K,L)
-    if param is None:
+    model.initialize(Z, W, M, N, initial_R, initial_C,K,L,semi_supervised)
+    if reg_op_learner is None:
         param={'alpha':0.1}
         model.init_learner(learner, param , train_loss, test_loss)
     else:
-        param={'alpha':param}
+        param={'alpha':reg_op_learner}
         model.init_learner(learner, param, train_loss, test_loss)
+        
+    if semi_supervised:
+        if reg_ss_model is None:
+            param={'tol':1e-4, 'fit_intercept':False}
+            model.init_ss_learner(ss_learner, param)
+        else:
+            param={'tol':1e-4, 'fit_intercept':False, 'C':reg_ss_model}
+            model.init_ss_learner(ss_learner, param)
     while True:
-        model.train()
-        model.update_row_assignments()
+        model.train() # Added the semi-supervised Training to the train method
+        model.update_row_assignments() #Changed cost for update row and col
         model.update_col_assignments()
         if old_objective - model.objective < convergence_threshold:
             break
         old_objective = model.objective
         obj.append(old_objective)
+        print old_objective
     if __debug__:
         print "Final objective value: %f" % (model.objective,)
     return obj

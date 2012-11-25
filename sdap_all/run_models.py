@@ -14,11 +14,12 @@ import run_model as runModel
 import gc
 
 from  analyzeRMSE import analyzeRMSE
+from getParameters import getParameters
 
 # TO DO : for now we are using hard assignment for the attribute clusters for the warm and cold start cases
 # Change this to soft assignment for better performance later on
 
-def run_models(datasetName,test, model_name,K,L,reg_lambda,reg_alpha1,reg_alpha2,delta_convg,num_iter,k_fold,pctg_users,pctg_movies,M = 2000, N = 10000, D1 = 3, D2 = 4, no_obs_mult = 0.04):
+def run_models(datasetName,test, model_name,K,L,delta_convg,num_iter,k_fold,pctg_users,pctg_movies,M = 2000, N = 10000, D1 = 3, D2 = 4, no_obs_mult = 0.04):
     print "START"
     
     # Get the Data
@@ -37,7 +38,6 @@ def run_models(datasetName,test, model_name,K,L,reg_lambda,reg_alpha1,reg_alpha2
         for fold in set_folds:
         #for fold in range(k_fold):            
             # Get Data Folds
-            gc.collect()
             hotStartDataFold = data.getHotStartDataFolds(fold, dataSet)
             train_I = hotStartDataFold['train_I']
             train_J = hotStartDataFold['train_J']
@@ -57,10 +57,9 @@ def run_models(datasetName,test, model_name,K,L,reg_lambda,reg_alpha1,reg_alpha2
             print "  TRAINING hot start "+model_name+" FOR FOLD "+str(fold+1)
             #if datasetName.upper().split('_')[0] == 'TEST':
                 #log_likelihood_art_data = data.get_likelihood_art_data(alphas, pis, zs, betas, train_I, train_J, train_Y, trctd_X1, trctd_X2, datasetName, model_name)    
-            train_op = runModel.runModelHotStart(model_name, K, L, trctd_X1, trctd_X2, train_I, train_J, train_Y, reg_lambda, num_iter, delta_convg, reg_alpha1,reg_alpha2,)
+            train_op = runModel.runModelHotStart(model_name, K, L, trctd_X1, trctd_X2, train_I, train_J, train_Y, num_iter, delta_convg)
             
             print "  DONE TRAINING "+model_name+" FOR FOLD "+str(fold+1) 
-            gc.collect()  
             
             # Calculate Hot Start Training RMSE
             hotStartTrainRMSE = runModel.calcHotStartTrainRMSE(model_name, K, L, trctd_X1, trctd_X2, train_I, train_J, train_Y, train_op)
@@ -68,8 +67,8 @@ def run_models(datasetName,test, model_name,K,L,reg_lambda,reg_alpha1,reg_alpha2
         
             # Calculate Hot Start Validation Set RMSE
             hotStartValRMSE = runModel.calcHotStartValRMSE(model_name, K, L, trctd_X1, trctd_X2, val_I, val_J, val_Y, train_op)
+            print hotStartValRMSE, hotStartTrainRMSE
             op.writeHotStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, hotStartValRMSE, 'val_'+str(fold), len(val_Y), reg_beta,  reg_alpha1, reg_alpha2)
-            del train_op
         
     if test == 'all' or test == 'warmStart':
         for fold in range(k_fold):      
@@ -135,101 +134,25 @@ def run_models(datasetName,test, model_name,K,L,reg_lambda,reg_alpha1,reg_alpha2
 
 if __name__ == '__main__':
     
+    # Get Parameters
     if platform.system() == 'Windows':
         param_file = 'D:/sdap/code/run_models_parameters.txt'
     elif platform.system() == 'Linux':
-        param_file = '/home/neeraj/sdap/code/run_models_parameters.txt'    
-    parameters = open(param_file,'r')
-    testcases = []
-    models = []
-    submodels = []
-    datasets = []
-    reg_betas = []
-    reg_alphas1 = []
-    reg_alphas2 = []    
-    for parameter in parameters:
-        if parameter.split(' ')[0] == 'test':
-            for testcase in parameter.strip().split(' '):
-                if testcase == 'test':
-                    continue
-                else:
-                    testcases.append(testcase.strip())
-            continue
-        if parameter.split(' ')[0] == 'models':
-            for model in parameter.strip().split(' '):
-                if model == 'models':
-                    continue
-                else:
-                    models.append(model.strip())
-            continue
-        if parameter.split(' ')[0] == 'submodels':
-            for submodel in parameter.strip().split(' '):
-                if submodel == 'submodels':
-                    continue
-                else:
-                    submodels.append(submodel.strip())
-            continue    
-        if parameter.split(' ')[0] == 'datasets':
-            for dataset in parameter.strip().split(' '):
-                if dataset == 'datasets':
-                    continue
-                else:
-                    datasets.append(dataset.strip())
-            continue 
-        if parameter.split(' ')[0] == 'K':
-            for K in parameter.strip().split(' '):
-                if K == 'K':
-                    continue
-                else:
-                    K = int(K)
-            continue
-        if parameter.split(' ')[0] == 'L':
-            for L in parameter.strip().split(' '):
-                if L == 'L':
-                    continue
-                else:
-                    L = int(L.strip())
-            continue
-        if parameter.split(' ')[0] == 'reg_beta':
-            for reg_beta in parameter.strip().split(' '):
-                if reg_beta == 'reg_beta':
-                    continue
-                else:
-                    reg_betas.append(float(reg_beta.strip()))
-            continue
-        if parameter.split(' ')[0] == 'reg_alpha1':
-            for reg_alpha1 in parameter.strip().split(' '):
-                if reg_alpha1 == 'reg_alpha1':
-                    continue
-                else:
-                    reg_alphas1.append(float(reg_alpha1.strip()))
-            continue
-        if parameter.split(' ')[0] == 'reg_alpha2':
-            for reg_alpha2 in parameter.strip().split(' '):
-                if reg_alpha2 == 'reg_alpha2':
-                    continue
-                else:
-                    reg_alphas2.append(float(reg_alpha2.strip()))
-            continue        
-    parameters.close()
-    if K == L and L == 1:
-        reg_alphas1 = [0]
-        reg_alphas2 = [0]
-    for datasetName in datasets:
-        for test in testcases:
-            for model in models:
-                if model =='scoal' or model == 'mf' or model == 'MFSCOALNAMSTYLE':
-                    reg_alphas1 = [0]
-                    reg_alphas2 = [0]
-                for submodel in submodels:
-                    for reg_beta in reg_betas:
-                        for reg_alpha1 in reg_alphas1:
-                            for reg_alpha2 in reg_alphas2:
-                                model_name = model+'_'+submodel
-                                t = time.time()                               
-                                run_models(datasetName,test, model_name,K,L,reg_beta,reg_alpha1, reg_alpha2,delta_convg = 1e-4,num_iter = 40,k_fold = 10,pctg_users= 100,pctg_movies = 100)  
-                                elapsed = time.time() - t
-                                print 'ELAPSED TIME' + str(elapsed)
+        param_file = '/home/neeraj/sdap/code/run_models_parameters.txt'
+        
+    testcases, models, submodels, datasets, Ls, Ks = getParameters(param_file)    
+    for i in range(len(Ks)):
+        K = Ks[i]
+        L = Ls[i]
+        for datasetName in datasets:
+            for test in testcases:
+                for model in models:
+                    for submodel in submodels:                       
+                        model_name = model+'_'+submodel
+                        t = time.time()                               
+                        run_models(datasetName,test, model_name,K,L,delta_convg = 1e-4,num_iter = 40,k_fold = 10,pctg_users= 100,pctg_movies = 100)  
+                        elapsed = time.time() - t
+                        print 'ELAPSED TIME' + str(elapsed)        
     
     # Analyze results
     analyzeRMSE()
