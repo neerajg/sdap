@@ -62,7 +62,7 @@ def hotStartTrainRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op):
     hotStartTrainRMSE = np.sqrt(np.mean((predictions-nonzero_Z)**2)) 
     return hotStartTrainRMSE
 
-def warmStartTrainRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op):
+'''def warmStartTrainRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op):
     M = X1.shape[0]
     N = X2.shape[0]
     model = train_op['model']
@@ -73,8 +73,8 @@ def warmStartTrainRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op):
     return warmStartTrainRMSE
 
 def coldStartTrainRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op):
-    coldStartTrainRMSE = warmStartTrainRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op)
-    return coldStartTrainRMSE
+    coldStartTrainRMSE = hotStartTrainRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op)
+    return coldStartTrainRMSE'''
 
 def hotStartValRMSE(K, L, X1, X2, val_I, val_J, val_Y, train_op):
     M = X1.shape[0]

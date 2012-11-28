@@ -8,8 +8,8 @@ import scipy.sparse as sp
 import numpy as np
 from SCOAL.run_scoal import run_scoal
 from SCOAL.run_scoal import predict_scoal
-from MF.mf import run_mf
-from MF.mf import mf_predict
+#from MF.mf import run_mf
+#from MF.mf import mf_predict
 import copy
 
 

@@ -8,17 +8,16 @@ Author - Neeraj Gaur
 import numpy as np
 import scipy.sparse as sp
 from learn_scoal import learn_scoal
-from scipy.cluster.vq import whiten, vq
 import sys
 import SCOAL.general_scoal_model as scoal
 
-def run_ssScoal(K, L, X1, X2, train_I, train_J, train_Y, learner,num_iter,delta_convg,sub_model,reg_op,reg_ss,semi_sup_learner):
+def run_ssScoal(K, L, X1, X2, train_I, train_J, train_Y, learner,num_iter,delta_convg,reg_op,reg_ss=None,semi_sup_learner=None,semi_supervised=True):
     
     model = scoal.GeneralScoalModel()
 
     Xs = [0,0]   
     Xs[0] = X1
-    Xs[1] = X2     
+    Xs[1] = X2
     M = Xs[0].shape[0]
     N = Xs[1].shape[0]
 
@@ -30,7 +29,7 @@ def run_ssScoal(K, L, X1, X2, train_I, train_J, train_Y, learner,num_iter,delta_
     rowAttr = Xs[0]
     colAttr = Xs[1]
     model.set_attributes(rowAttr, colAttr, crossAttr=None)
-    obj = learn_scoal(model, Z, train_W, K, L, learner,num_iter,delta_convg,reg_op_learner=reg_op,ss_learner=semi_sup_learner,reg_ss_model=reg_ss,semi_supervised=True)
+    obj = learn_scoal(model, Z, train_W, K, L, learner,num_iter,delta_convg,reg_op_learner=reg_op,ss_learner=semi_sup_learner,reg_ss_model=reg_ss,semi_supervised=semi_supervised)
     parameters = np.zeros((K,L,rowAttr.shape[1] + colAttr.shape[1]))
     for k in range(K):
         for l in range(L):
@@ -42,10 +41,13 @@ def run_ssScoal(K, L, X1, X2, train_I, train_J, train_Y, learner,num_iter,delta_
               'col_assignment':model.C,
               'parameters':parameters
               }
+    
+    regs = [reg_op,reg_ss]
 
     train_op = {'params':params,
                 'obj':obj,
-                'model':model
+                'model':model,
+                'regs':regs
                 }
 
     return train_op
@@ -54,13 +56,14 @@ def hotStartTrainRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op):
     M = X1.shape[0]
     N = X2.shape[0]
     model = train_op['model']
-    predictions = predict_scoal(train_I, train_J, train_Y, M, N, model)
+    centroids = train_op['centroids']
+    predictions = predict_scoal(train_I, train_J, train_Y, M, N, model,X1,X2,centroids)
     Z = sp.csr_matrix((train_Y, (train_I,train_J)), shape=(M,N))
     nonzero_Z = np.array(Z[(train_I,train_J)]).ravel()
     hotStartTrainRMSE = np.sqrt(np.mean((predictions-nonzero_Z)**2)) 
     return hotStartTrainRMSE
 
-def warmStartTrainRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op):
+'''def warmStartTrainRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op):
     M = X1.shape[0]
     N = X2.shape[0]
     model = train_op['model']
@@ -68,23 +71,24 @@ def warmStartTrainRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op):
     Z = sp.csr_matrix((train_Y, (train_I,train_J)), shape=(M,N))
     nonzero_Z = np.array(Z[(train_I,train_J)]).ravel()
     warmStartTrainRMSE = np.sqrt(np.mean((predictions-nonzero_Z)**2)) 
-    return warmStartTrainRMSE
+    return warmStartTrainRMSE'''
 
 def coldStartTrainRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op):
-    coldStartTrainRMSE = warmStartTrainRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op)
+    coldStartTrainRMSE = hotStartTrainRMSE(K, L, X1, X2, train_I, train_J, train_Y, train_op)
     return coldStartTrainRMSE
 
 def hotStartValRMSE(K, L, X1, X2, val_I, val_J, val_Y, train_op):
-    M = X1.shape[0]
+    return hotStartTrainRMSE(K, L, X1, X2, val_I, val_J, val_Y, train_op)
+    ''''M = X1.shape[0]
     N = X2.shape[0]
     model = train_op['model']
     predictions = predict_scoal(val_I, val_J, val_Y, M, N, model)
     Z = sp.csr_matrix((val_Y, (val_I,val_J)), shape=(M,N))
     nonzero_Z = np.array(Z[(val_I,val_J)]).ravel()
     hotStartValRMSE = np.sqrt(np.mean((predictions-nonzero_Z)**2)) 
-    return hotStartValRMSE
+    return hotStartValRMSE'''
 
-def warmStartValRMSE(K, L, X1, X2, val_I, val_J, val_Y, train_op, centroids):
+'''def warmStartValRMSE(K, L, X1, X2, val_I, val_J, val_Y, train_op, centroids):
     M = X1.shape[0]
     N = X2.shape[0]
     I = train_op['params']['I']
@@ -123,16 +127,15 @@ def warmStartValRMSE(K, L, X1, X2, val_I, val_J, val_Y, train_op, centroids):
     Z = sp.csr_matrix((val_Y, (val_I,val_J)), shape=(M,N))
     nonzero_Z = np.array(Z[(val_I,val_J)]).ravel()
     warmStartValRMSE = np.sqrt(np.mean((predictions-nonzero_Z)**2)) 
-    return warmStartValRMSE
+    return warmStartValRMSE'''
 
-def coldStartValRMSE(K, L, X1, X2, val_I, val_J, val_Y, train_op, centroids):
-    coldStartValRMSE = warmStartValRMSE(K, L, X1, X2, val_I, val_J, val_Y, train_op, centroids)
-    return coldStartValRMSE
+def coldStartValRMSE(K, L, X1, X2, val_I, val_J, val_Y, train_op):
+    return hotStartTrainRMSE(K, L, X1, X2, val_I, val_J, val_Y, train_op)
 
-def predict_scoal(I, J, Y, M, N, model):
+def predict_scoal(I, J, Y, M, N, model,X1,X2,centroids):
     W = sp.csr_matrix((np.ones(len(Y)),(I,J)), shape=(M,N))
     I,J = sp.find(W)[:2]
-    predictions = model.predict(I,J)
+    predictions = model.predict(I,J,X1,X2,centroids)
     return predictions
 
 if '__main__' == __name__:

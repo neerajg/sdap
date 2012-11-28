@@ -1,8 +1,9 @@
-from scikit.learn import linear_model
-from scikit.learn import metrics
-from scikit.learn import svm
+from sklearn import linear_model
+from sklearn import metrics
+from sklearn import svm
 from numexpr import evaluate
 import numpy as np
+from SCOAL.kmeans import kMeans
 
 ones = np.ones
 class MeanModel(object):
@@ -52,14 +53,17 @@ regressors = {# regressors
                 # sgd regressor
                 "sgd-regress":linear_model.sparse.SGDRegressor}
 classifiers = {# classifiers
-                "mean-class":MeanModelClassifier,
-                "logistic":linear_model.LogisticRegression, # l1 regularization
+                #"mean-class":MeanModelClassifier,
+                #"logistic":linear_model.LogisticRegression, # l1 regularization
                 "svm":svm.LinearSVC, # linear svm
                 # sparse classifiers
                 "sp-svm":svm.sparse.LinearSVC,
                 # sgd classifier
                 "sgd-class":linear_model.sparse.SGDClassifier
-                }#  add more as as needed        
+                }#  add more as as needed
+clusterers = {#Clusterers
+              "kMeans":kMeans # self kMeans class
+              }   
 
 squeeze = np.squeeze
 abs = np.abs
@@ -74,7 +78,11 @@ class learner_class(object):
             self.predict = self.model.predict
         elif model in classifiers:            
             self.model = classifiers[model](**kwargs)
-            self.predict = self.squeeze_decision
+            #self.predict = self.squeeze_decision
+            self.predict = self.model.predict
+        elif model in clusterers:
+            self.model = clusterers[model](**kwargs)
+            self.predict = self.model.predict
         else:
             raise NameError("model is %s is not defined" % (model) )
             

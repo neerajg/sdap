@@ -19,7 +19,9 @@ from getParameters import getParameters
 # TO DO : for now we are using hard assignment for the attribute clusters for the warm and cold start cases
 # Change this to soft assignment for better performance later on
 
-def run_models(datasetName,test, model_name,K,L,delta_convg,num_iter,k_fold,pctg_users,pctg_movies,M = 2000, N = 10000, D1 = 3, D2 = 4, no_obs_mult = 0.04):
+def run_models(datasetName,test, model_name,K,L,delta_convg,
+               num_iter,k_fold,pctg_users,pctg_movies,regs = None,
+               testtype=3,M = 2000, N = 10000, D1 = 3, D2 = 4, no_obs_mult = 0.04):
     print "START"
     
     # Get the Data
@@ -57,21 +59,22 @@ def run_models(datasetName,test, model_name,K,L,delta_convg,num_iter,k_fold,pctg
             print "  TRAINING hot start "+model_name+" FOR FOLD "+str(fold+1)
             #if datasetName.upper().split('_')[0] == 'TEST':
                 #log_likelihood_art_data = data.get_likelihood_art_data(alphas, pis, zs, betas, train_I, train_J, train_Y, trctd_X1, trctd_X2, datasetName, model_name)    
-            train_op = runModel.runModelHotStart(model_name, K, L, trctd_X1, trctd_X2, train_I, train_J, train_Y, num_iter, delta_convg)
-            
+            train_op = runModel.runModelHotStart(model_name, K, L, trctd_X1, trctd_X2, train_I, train_J, train_Y, num_iter, delta_convg,regs)
+            train_op['centroids']=[]
             print "  DONE TRAINING "+model_name+" FOR FOLD "+str(fold+1) 
             
             # Calculate Hot Start Training RMSE
             hotStartTrainRMSE = runModel.calcHotStartTrainRMSE(model_name, K, L, trctd_X1, trctd_X2, train_I, train_J, train_Y, train_op)
-            op.writeHotStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, hotStartTrainRMSE, 'train_'+str(fold), len(train_Y), reg_beta, reg_alpha1, reg_alpha2)
+            op.writeHotStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, hotStartTrainRMSE, 'train_'+str(fold), len(train_Y),train_op['regs'])
         
             # Calculate Hot Start Validation Set RMSE
             hotStartValRMSE = runModel.calcHotStartValRMSE(model_name, K, L, trctd_X1, trctd_X2, val_I, val_J, val_Y, train_op)
             print hotStartValRMSE, hotStartTrainRMSE
-            op.writeHotStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, hotStartValRMSE, 'val_'+str(fold), len(val_Y), reg_beta,  reg_alpha1, reg_alpha2)
+            op.writeHotStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, hotStartValRMSE, 'val_'+str(fold), len(val_Y),train_op['regs'])
         
-    if test == 'all' or test == 'warmStart':
-        for fold in range(k_fold):      
+    '''if test == 'all' or test == 'warmStart':
+        #for fold in range(k_fold):
+        for fold in set_folds:      
             # Get Data Folds
             warmStartDataFold = data.getWarmStartDataFolds(fold, dataSet, datasetName)
             train_I = warmStartDataFold['train_I']
@@ -95,10 +98,11 @@ def run_models(datasetName,test, model_name,K,L,delta_convg,num_iter,k_fold,pctg
             # Calculate Warm Start Validation Set RMSE
             warmStartValRMSE = runModel.calcWarmStartValRMSE(model_name, K, L, trctd_X1, trctd_X2, val_I, val_J, val_Y, train_op, centroids)
             op.writeWarmStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, warmStartValRMSE, 'val_'+str(fold), len(val_Y))
-            del train_op       
+            del train_op'''     
 
     if test == 'all' or test == 'coldStart':
-        for fold in range(k_fold):
+        #for fold in range(k_fold):
+        for fold in set_folds:
             # Get Data Folds
             coldStartDataFold = data.getColdStartDataFolds(fold, dataSet)
             train_I = coldStartDataFold['train_I']
@@ -115,16 +119,18 @@ def run_models(datasetName,test, model_name,K,L,delta_convg,num_iter,k_fold,pctg
             
             # Run training for Cold Start
             print "  TRAINING cold start "+model_name+" FOR FOLD "+str(fold+1)       
-            train_op = runModel.runModelColdStart(model_name, K, L, trctd_X1, trctd_X2, train_I, train_J, train_Y, reg_beta)
+            train_op = runModel.runModelColdStart(model_name, K, L, trctd_X1, trctd_X2, train_I, train_J, train_Y, num_iter, delta_convg,regs)
+            train_op['centroids']=centroids            
             print "  DONE TRAINING "+model_name+" FOR FOLD "+str(fold+1)
             
             # Calculate Cold Start Training RMSE
             coldStartTrainRMSE = runModel.calcColdStartTrainRMSE(model_name, K, L, trctd_X1, trctd_X2, train_I, train_J, train_Y, train_op)
-            op.writeColdStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, coldStartTrainRMSE, 'train_'+str(fold), len(train_Y))                          
+            op.writeColdStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, coldStartTrainRMSE, 'train_'+str(fold), len(train_Y),train_op['regs'])                          
 
             # Calculate Cold Start Validation Set RMSE
-            coldStartValRMSE = runModel.calcColdStartValRMSE(model_name, K, L, trctd_X1, trctd_X2, val_I, val_J, val_Y, train_op, centroids)
-            op.writeColdStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, coldStartValRMSE, 'val_'+str(fold), len(val_Y))
+            coldStartValRMSE = runModel.calcColdStartValRMSE(model_name, K, L, trctd_X1, trctd_X2, val_I, val_J, val_Y, train_op)
+            print coldStartValRMSE, coldStartTrainRMSE            
+            op.writeColdStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, coldStartValRMSE, 'val_'+str(fold), len(val_Y),train_op['regs'])
         
         # Code for imputing attributes and testing the performance in that respect
         # Write the parameters, lambda value, and obj function over iterations to file for each of the test cases
@@ -140,19 +146,35 @@ if __name__ == '__main__':
     elif platform.system() == 'Linux':
         param_file = '/home/neeraj/sdap/code/run_models_parameters.txt'
         
-    testcases, models, submodels, datasets, Ls, Ks = getParameters(param_file)    
-    for i in range(len(Ks)):
+    parameter_sets = getParameters(param_file)
+    for parameter_set in parameter_sets:
+        K = parameter_set['K']
+        L = parameter_set['L']
+        datasetName = parameter_set['datasetName']
+        test = parameter_set['test']
+        model = parameter_set['model']
+        submodel = parameter_set['submodel']     
+        regs = parameter_set['regs']
+        if not regs:
+            regs = None             
+        model_name = model+'_'+submodel
+        t = time.time()                               
+        run_models(datasetName,test, model_name,K,L,regs=regs,delta_convg = 1e-6,num_iter = 40,k_fold = 10,pctg_users= 100,pctg_movies = 100)  
+        elapsed = time.time() - t
+        print 'ELAPSED TIME' + str(elapsed)        
+            
+    '''for i in range(len(Ks)):
         K = Ks[i]
         L = Ls[i]
         for datasetName in datasets:
             for test in testcases:
                 for model in models:
-                    for submodel in submodels:                       
+                    for submodel in submodels:                    
                         model_name = model+'_'+submodel
                         t = time.time()                               
                         run_models(datasetName,test, model_name,K,L,delta_convg = 1e-4,num_iter = 40,k_fold = 10,pctg_users= 100,pctg_movies = 100)  
                         elapsed = time.time() - t
-                        print 'ELAPSED TIME' + str(elapsed)        
+                        print 'ELAPSED TIME' + str(elapsed)'''        
     
     # Analyze results
     analyzeRMSE()

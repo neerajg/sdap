@@ -172,6 +172,7 @@ def learn_scoal_wrapper(**argv):
     #learn_scoal(model, Z, W, K, L, learner, param, train_loss, test_loss)
     model.save(model_filename)
 
+# TODO : Find a clean way to take in input parameters for the learner classes
 def learn_scoal(model, Z, W, K, L, learner,num_iter=100,
                 delta_convg = 1e-6, reg_op_learner = None, 
                 train_loss = None, test_loss = None,
@@ -193,17 +194,20 @@ def learn_scoal(model, Z, W, K, L, learner,num_iter=100,
         model.init_learner(learner, param, train_loss, test_loss)
         
     if semi_supervised:
-        if reg_ss_model is None:
-            param={'tol':1e-4, 'fit_intercept':False}
-            model.init_ss_learner(ss_learner, param)
-        else:
-            param={'tol':1e-4, 'fit_intercept':False, 'C':reg_ss_model}
-            model.init_ss_learner(ss_learner, param)
+        if reg_ss_model == 'logistic':
+            if reg_ss_model is None:
+                param={'tol':1e-4, 'fit_intercept':False}
+                model.init_ss_learner(ss_learner, param)
+            else:
+                param={'tol':1e-4, 'fit_intercept':False, 'C':reg_ss_model}
+        elif ss_learner == 'kMeans':
+            param = [{'k':K},{'k':L}]
+        model.init_ss_learner(ss_learner, param)
     while True:
         model.train() # Added the semi-supervised Training to the train method
         model.update_row_assignments() #Changed cost for update row and col
         model.update_col_assignments()
-        if old_objective - model.objective < convergence_threshold:
+        if old_objective - model.objective < delta_convg:
             break
         old_objective = model.objective
         obj.append(old_objective)

@@ -3,17 +3,19 @@ Created on Nov 22, 2012
 
 @author: neeraj
 '''
+
+import platform,sys
+
 def getParameters(param_file):  
     parameters = open(param_file,'r')
+    parameter_sets = []
     testcases = []
     models = []
     submodels = []
     datasets = []
-    """reg_betas = []
-    reg_alphas1 = []
-    reg_alphas2 = []"""
     Ls = []
     Ks = []
+    regularizers = []
     for parameter in parameters:
         if parameter.split(' ')[0] == 'test':
             for testcase in parameter.strip().split(' '):
@@ -56,7 +58,50 @@ def getParameters(param_file):
                     continue
                 else:
                     Ls.append(int(L.strip()))
-            continue      
+            continue
+        if parameter.split(' ')[0].startswith('reg'):
+            reg = []
+            for regularizer in parameter.strip().split(' '):
+                if regularizer.startswith('reg'):
+                    continue
+                else:
+                    reg.append(float(regularizer.strip()))
+            regularizers.append(reg)            
+                 
     parameters.close()
-    
-    return testcases, models, submodels, datasets, Ls, Ks
+    for testcase in testcases:
+        for dataset in datasets:
+            for K in Ks:
+                for L in Ls:
+                    for model in models:
+                        if model.upper()=='SCOAL':
+                            sub_models_to_consider = list(set([x.split('+')[0] for x in submodels]))
+                            if regularizers:
+                                reg_sets = list(set(regularizers[0]))
+                        else:
+                            sub_models_to_consider = submodels
+                            if regularizers:
+                                reg_sets = [[x,y]for x in regularizers[0] for y in regularizers[1]]                                
+                        for submodel in sub_models_to_consider: 
+                            for reg_set in reg_sets:
+                                
+                                parameter_set = {'test':testcase,
+                                                 'datasetName':dataset,
+                                                 'K':K,
+                                                 'L':L,
+                                                 'model':model,
+                                                 'submodel':submodel,
+                                                 'regs':reg_set
+                                                 }
+                                parameter_sets.append(parameter_set)
+    return parameter_sets
+
+if __name__ == '__main__':
+    # Get Parameters
+    if platform.system() == 'Windows':
+        param_file = 'D:/sdap/code/run_models_parameters.txt'
+    elif platform.system() == 'Linux':
+        param_file = '/home/neeraj/sdap/code/run_models_parameters.txt'
+        
+    parameter_sets = getParameters(param_file)
+    sys.exit()

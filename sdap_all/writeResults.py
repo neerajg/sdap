@@ -30,10 +30,10 @@ def makeDir(model_name, datasetName):
                              
     return model_results
 
-def writeHotStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, rmse, data_set, length, reg_beta,  reg_alpha1, reg_alpha2):
+def writeHotStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, rmse, data_set, length, regs):
     #print "BEFORE WRITING RESULTS"
     results_dir = model_results + 'hotStart/'
-    writeRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, rmse, data_set, length, results_dir, reg_beta,  reg_alpha1, reg_alpha2)
+    writeRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, rmse, data_set, length, results_dir,regs)
     #print "AFTER WRITING RESULTS"    
     return
 
@@ -42,16 +42,18 @@ def writeWarmStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, rms
     writeRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, rmse, data_set, length, results_dir)
     return    
 
-def writeColdStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, rmse, data_set, length):
+def writeColdStartRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, rmse, data_set, length,regs):
     results_dir = model_results + 'coldStart/'
-    writeRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, rmse, data_set, length, results_dir)
+    writeRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, rmse, data_set, length, results_dir,regs)
     return
 
-def writeRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, rmse, data_set, length, results_dir, reg_beta,  reg_alpha1, reg_alpha2):
+def writeRMSE(K, L, k_fold, pctg_users, pctg_movies, model_results, rmse, data_set, length, results_dir, regs):
     if not os.path.isdir(results_dir):
         os.mkdir(results_dir)
-
-    file_name = results_dir+'K_'+str(K)+'_L_'+str(L)+'_folds_'+str(k_fold)+'_pctg_users_'+str(pctg_users)+'_pctg_movies_'+str(pctg_users)+'_reg_beta_'+str(reg_beta)+'_reg_alpha1_'+str(reg_alpha1)+'_reg_alpha2_'+str(reg_alpha2)+'_.dat'
+    file_name = results_dir+'K_'+str(K)+'_L_'+str(L)+'_folds_'+str(k_fold)+'_pctg_users_'+str(pctg_users)+'_pctg_movies_'+str(pctg_users)
+    for i in range(len(regs)):
+        file_name = file_name+'_reg'+str(i+1)+'_'+str(regs[i])
+    file_name = file_name+'_.dat'
     if data_set == 'train_0':
         ofile = open(file_name,'w')
     else:

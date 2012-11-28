@@ -1,8 +1,8 @@
 import numpy as np
 import scipy.sparse as sp
 import scipy.io
-import cPickle as pickle
 from scoal_defs import learner_class, train_loss_dict, test_loss_dict
+from scipy.cluster.vq import whiten, vq
         
 class GeneralScoalModel(object):
 
@@ -44,7 +44,7 @@ class GeneralScoalModel(object):
             else:
                 self.crossAttr = crossAttr
 
-    def initialize(self, Z, W, M, N, initial_R, initial_C,K,L,semi_supervised):
+    def initialize(self, Z, W, M, N, initial_R, initial_C,K,L,semi_supervised=False):
         self.R = initial_R
         self.C = initial_C
         self.M = M
@@ -112,11 +112,14 @@ class GeneralScoalModel(object):
         ###############################################################
         # Setup semi-supervised co-cluster learning models
         ###############################################################
-        self.ss_models = np.empty((2, 1), dtype = 'object') # For Dyadic data
-        self.cumsum_log_prob = np.zeros((2,1))
-        self.log_prob_ss = [np.empty((self.M,self.K)),np.empty((self.N,self.L))]
+        self.ss_models = np.empty((2,), dtype = 'object') # For Dyadic data
+        self.cumsum_obj = np.zeros((2,))
+        self.obj_ss = [np.empty((self.M,self.K)),np.empty((self.N,self.L))]
         for i in range(2):
-            self.ss_models[i] = learner_class(learner, params)
+            if type(params) is dict:
+                self.ss_models[i] = learner_class(learner, params)
+            else:
+                self.ss_models[i] = learner_class(learner, params[i])
         
     def build_covariates(self, filtered_I, filtered_J):
         # Extract and Normalize covariates
@@ -150,19 +153,25 @@ class GeneralScoalModel(object):
         if self.semi_supervised:
             for i in range(2):
                 if i == 0:
-                    target = self.R
-                    number = self.M
-                    training_vector = np.hstack((self.rowAttr,np.ones((self.M,1))))
+                    train_indices = list(set(self.I))
+                    target = self.R[train_indices]
+                    number = len(train_indices)
+                    training_vector = np.hstack((self.rowAttr[train_indices],np.ones((number,1))))
                 else:
-                    target = self.C
-                    number = self.N
-                    training_vector = np.hstack((self.colAttr,np.ones((self.N,1))))
+                    train_indices = list(set(self.J))
+                    target = self.C[train_indices]
+                    number = len(train_indices)
+                    training_vector = np.hstack((self.colAttr[train_indices],np.ones((number,1))))
                 
                 # Train the semi-supervised co-clustering model
                 self.ss_models[i].fit(training_vector, target)
-                self.log_prob_ss[i] = - self.ss_models[i].predict_log_proba(training_vector)
-                self.cumsum_log_prob[i] = [self.log_prob_ss[i][j,self.R[j]] for j in range(number)]
-                total_error += self.cumsum_log_prob[i]
+                # TODO : generalize this for models other than logistic (make it find obj fn or smthn)
+                self.obj_ss[i][train_indices] = abs(self.ss_models[i].model.predict_log_proba(training_vector))
+                if i == 0:
+                    self.cumsum_obj[i] = np.sum([self.obj_ss[i][j,self.R[j]] for j in range(number)])
+                else:
+                    self.cumsum_obj[i] = np.sum([self.obj_ss[i][j,self.C[j]] for j in range(number)])
+                total_error += self.cumsum_obj[i]
 
         self.objective = total_error / self.num_observations
 
@@ -175,7 +184,7 @@ class GeneralScoalModel(object):
         if not self.semi_supervised:
             errors = np.zeros((self.M, self.K))
         else:
-            errors = self.cumsum_log_prob[1] + self.log_prob_ss[0]
+            errors = self.obj_ss[0]
         row_errors = np.zeros(self.M)
         
         for c in range(self.L):
@@ -206,7 +215,10 @@ class GeneralScoalModel(object):
             self.R[m] = np.argmin(errors[m,:])
             row_errors[m] = errors[m,self.R[m]]
         # Sum of all (squared) errors / number of observations = objective
-        self.objective = np.sum(row_errors)/self.num_observations
+        if self.semi_supervised:
+            self.objective = (self.cumsum_obj[1] + np.sum(row_errors))/self.num_observations
+        else:
+            self.objective = np.sum(row_errors)/self.num_observations
         if __debug__:
             print "Objective after update_row_assignments: %f" % (self.objective,)
 
@@ -214,7 +226,7 @@ class GeneralScoalModel(object):
         if not self.semi_supervised:
             errors = np.zeros((self.N, self.L))
         else:
-            errors = self.cumsum_log_prob[0] + self.log_prob_ss[1]        
+            errors = self.obj_ss[1]        
         col_errors = np.zeros(self.N)
         for r in range(self.K):
             # Filter out irrelevant rows
@@ -235,14 +247,59 @@ class GeneralScoalModel(object):
         for n in range(self.N):
             self.C[n] = np.argmin(errors[n,:])
             col_errors[n] = errors[n,self.C[n]]
-        self.objective = np.sum(col_errors)/self.num_observations
+        if self.semi_supervised:            
+            self.objective = (self.cumsum_obj[0] + np.sum(col_errors))/self.num_observations
+        else:
+            self.objective = np.sum(col_errors)/self.num_observations
         if __debug__:
             print "Objective after update_col_assignments: %f" % (self.objective,)
 
-    def predict(self, I, J, quantized=False):
+    def predict(self,I,J,X1,X2,centroids,quantized=False):
         total_I = np.array([])
         total_J = np.array([])
         total_predictions = np.array([])
+        # Find the row/col clusters for new I/J
+        # Find the I/J which are new
+        new_I = list(set(I).difference(set(self.I)))
+        new_J = list(set(J).difference(set(self.J)))
+        if new_I:
+            if self.semi_supervised:
+                self.R[new_I] = self.ss_models[0].model.predict(np.hstack((X1[new_I],np.ones((len(new_I),1)))))
+            else:
+                # Map the cold start Validation set users and movies to their clusters
+                # Users
+                user_cluster = vq(whiten(X1), centroids['user_centroids'])[0]
+                user_cluster_seen = user_cluster[list(set(I))]
+                user_cocluster = self.R[list(set(I))]
+                mapping = np.zeros((self.K,1))
+                for k_clust in range(self.K):
+                    users_in_cluster = [x for x in range(len(user_cluster_seen)) if user_cluster_seen[x] == k_clust]
+                    users_in_cluster = user_cocluster[users_in_cluster]
+                    temp = [len(filter(lambda x: x == k_coclust, users_in_cluster)) for k_coclust in range(self.K)]
+                    mapping[k_clust] = temp.index(max(temp))
+                val_users = np.array(list(set(I)))        
+                for user in val_users:
+                    self.R[user] = mapping[user_cluster[user]]
+                
+        if new_J:
+            if self.semi_supervised:
+                self.C[new_J] = self.ss_models[1].model.predict(np.hstack((X2[new_J],np.ones((len(new_J),1)))))
+            else:
+                # Movies
+                movie_cluster = vq(whiten(X2), centroids['movie_centroids'])[0]
+                movie_cluster_seen = movie_cluster[list(set(J))]
+                movie_cocluster = self.C[list(set(J))]
+                mapping = np.zeros((self.L,1))
+                for l_clust in range(self.L):
+                    movies_in_cluster = [x for x in range(len(movie_cluster_seen)) if movie_cluster_seen[x] == l_clust]
+                    movies_in_cluster = movie_cocluster[movies_in_cluster]
+                    temp = [len(filter(lambda x: x == l_coclust, movies_in_cluster)) for l_coclust in range(self.L)]
+                    mapping[l_clust] = temp.index(max(temp))
+                val_movies = np.array(list(set(J)))        
+                for movie in val_movies:
+                    self.C[movie] = mapping[movie_cluster[movie]]        
+
+            
         # Build the current covariates matrix
         for r in range(self.K):
             for c in range(self.L):

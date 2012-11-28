@@ -42,7 +42,7 @@ def analyzeRMSE():
                 results_files = os.listdir(testcase_dir)
                 for file_current in results_files:
                     fs = file_current.split('_')                    
-                    if len(fs)<5:
+                    if len(fs)<2:
                         continue
                     file_name = testcase_dir + file_current
                     train_rmses = []
@@ -67,12 +67,21 @@ def analyzeRMSE():
                     train_rmse, train_std_dev = calc_rmse(train_rmses,total_size_train)
 
                     ofilename = analyzed_dir + 'K_'+fs[1]+'_L_'+fs[3]+'_folds_'+fs[5]+'.xls'
+                    regs = np.empty(((len(fs)-13)/2,))
+                    for i in range(len(regs)):
+                        regs[i] = fs[13+2*i]
                     if not os.path.isfile(ofilename):
                         ofile = open(ofilename,'w')
-                        print>>ofile,'Reg Beta\tReg Alpha1\tReg Alpha2\tTrain RMSE(Mean)\tTrain RMSE(std dev)\tValidation RMSE(mean)\tValidation RMSE(std dev)'
+                        op_str = ''
+                        for i in range(len(regs)):
+                            op_str = op_str+'Reg'+str(i+1)+'\t'
+                        print>>ofile,op_str+'Train RMSE(Mean)\tTrain RMSE(std dev)\tValidation RMSE(mean)\tValidation RMSE(std dev)'
                     else:
                         ofile = open(ofilename,'a')
-                    print>>ofile,str(fs[14])+'\t'+str(fs[17])+'\t'+str(fs[20])+'\t'+str(train_rmse)+'\t'+str(train_std_dev)+'\t'+str(val_rmse)+'\t'+str(val_std_dev)
+                    op_str = ''
+                    for i in range(len(regs)):
+                        op_str = op_str+str(regs[i])+'\t'                        
+                    print>>ofile,op_str+str(train_rmse)+'\t'+str(train_std_dev)+'\t'+str(val_rmse)+'\t'+str(val_std_dev)
                     ofile.close()
 
 if __name__ == '__main__':

@@ -14,11 +14,7 @@ from scipy.special import gammaln
 import scipy.sparse as sp
 from AAMMBAE.misc import objective_fn
 import scipy.optimize as opt
-
-try:
-    from scikits.learn.linear_model import Ridge
-except ImportError:
-    from sklearn.linear_model import Ridge
+from sklearn.linear_model import Ridge
 
 sigma_tolerance = 1e-4
 
