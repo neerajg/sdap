@@ -1,0 +1,8 @@
+datasets eHarmony2
+test all
+models scoal ss-scoal
+submodels logistic+kMeans logistic+logistic
+K 2 
+L 2
+reg1 0.02 1.0 0.8 0.6 0.4 0.2 0.1
+reg2 1.0 0.8 0.6 0.4 0.2 0.1
