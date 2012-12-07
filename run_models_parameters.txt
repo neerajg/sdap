@@ -1,8 +1,0 @@
-datasets movielens
-test all
-models ss-scoal scoal
-submodels ridge+kMeans ridge+logistic
-K 2
-L 4
-reg1 0.1 0.08 0.06 0.04 0.02 0.01 0.008 0.006 0.004 0.002
-reg2 1.0 0.8 0.6 0.4 0.2
