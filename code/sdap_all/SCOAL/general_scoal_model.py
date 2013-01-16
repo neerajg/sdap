@@ -6,15 +6,17 @@ from scipy.cluster.vq import whiten, vq
 from multiprocessing import Array
 from ctypes import c_double, c_int
 from numpy.ctypeslib import as_array
-from itertools import repeat, izip
+from itertools import repeat, izip, product
+from multiprocessing import Pool
         
 class GeneralScoalModel(object):
 
-    def __init__(self, rowAttr_filename=None, colAttr_filename=None, crossAttr_filename=None):
+    def __init__(self, rowAttr_filename=None, colAttr_filename=None, crossAttr_filename=None,parallel_processing=False):
         self.objective = 1e99
         self.rowAttr = None
         self.colAttr = None
         self.crossAttr = None
+        self.parralel_processing = parallel_processing
         if rowAttr_filename is not None:
             try:
                 self.rowAttr = scipy.io.mmread(rowAttr_filename)
@@ -29,7 +31,7 @@ class GeneralScoalModel(object):
             try:
                 self.crossAttr = scipy.io.mmread(crossAttr_filename)
             except:
-                pass
+                pass            
 
     def set_attributes(self, rowAttr=None, colAttr=None, crossAttr=None):
         if rowAttr is not None:
@@ -47,6 +49,8 @@ class GeneralScoalModel(object):
                 self.crossAttr = np.hstack((self.crossAttr, crossAttr))
             else:
                 self.crossAttr = crossAttr
+        #self.shared_rowAttr = as_array(Array(c_double,self.rowAttr.ravel(),lock=False)).reshape(self.rowAttr.shape)
+        #self.shared_colAttr = as_array(Array(c_double,self.colAttr.ravel(),lock=False)).reshape(self.colAttr.shape)                
 
     def initialize(self, Z, W, M, N, initial_R, initial_C,K,L,semi_supervised=False):
         self.R = initial_R
@@ -88,6 +92,13 @@ class GeneralScoalModel(object):
 
         bin_count_cols = np.bincount(self.J)
         self.cold_start_cols[bin_count_cols>0] = 0
+
+        #self.shared_I = as_array(Array(c_int,self.I,lock=False)).reshape(self.I.shape)
+        #self.shared_J = as_array(Array(c_int,self.J,lock=False)).reshape(self.J.shape)
+        #self.shared_Z = as_array(Array(c_int,self.Z,lock=False)).reshape(self.Z.shape) 
+        r_list = range(self.K)
+        c_list = range(self.L)
+        self.rc_list = [[r,c] for r in r_list for c in c_list] #list(product(r_list,c_list))
         
     def init_learner(self, learner=None, params={'alpha':0.1}, train_loss=None, test_loss=None):
         
@@ -111,6 +122,8 @@ class GeneralScoalModel(object):
         self.train_loss_type = train_loss
         self.train_loss = train_loss_dict[train_loss]
         self.test_loss = test_loss_dict[test_loss]
+        self.learner = learner
+        self.learner_params = params
 
     def init_ss_learner(self, learner=None, params={'alpha':0.1}):
         
@@ -134,28 +147,43 @@ class GeneralScoalModel(object):
 
     def train(self):
         total_error = 0.0
-        for r in range(self.K):
-            for c in range(self.L):
-                # Filter out irrelevant rows
-                row_index  = self.R[self.I]==r
-                filtered_I = self.I[row_index]
-                filtered_J = self.J[row_index]
-                filtered_Z = self.Z[row_index]
-                # Filter out irrelevant cols
-                col_index  = self.C[filtered_J]==c
-                filtered_I = filtered_I[col_index]
-                filtered_Z = filtered_Z[col_index]
-                filtered_J = filtered_J[col_index]
-                if len(filtered_Z)>0:
-                    # Build the current covariates matrix
-                    covariates = self.build_covariates(filtered_I, filtered_J)
-                    # call learner
-                    self.models[r,c].fit(covariates, filtered_Z)
-                    if self.train_loss_type == 'negloglik':
-                        total_error += self.train_loss(filtered_Z, self.models[r,c].model.predict_log_proba(covariates)).sum()
-                    else:
-                        total_error += self.train_loss(filtered_Z, self.models[r,c].predict(covariates)).sum()
-                    del covariates
+        if self.parralel_processing:
+            shared_R = as_array(Array(c_int,self.R,lock=False)).reshape(self.R.shape)
+            shared_C = as_array(Array(c_int,self.C,lock=False)).reshape(self.C.shape)
+            #models_coefs = [[self.models[r,c].model.coef_,self.models[r,c].model.intercept_] for r in r_list for c in c_list]
+            iterable_data = izip(self.rc_list,repeat(shared_R),repeat(shared_C),
+                            repeat(self.shared_I),repeat(self.shared_J),
+                            repeat(self.shared_rowAttr),repeat(self.shared_colAttr),repeat(self.shared_Z),
+                            repeat(self.learner_params),repeat(self.learner),
+                            repeat(self.train_loss_type),repeat(self.num_observations),repeat(self.M),repeat(self.N))
+            #iterable_data = [2,6]
+            P = Pool(2)
+            result = P.map(train_process,iterable_data)
+            P.close()
+            P.join()
+        else:
+            for r in range(self.K):
+                for c in range(self.L):
+                    # Filter out irrelevant rows
+                    row_index  = self.R[self.I]==r
+                    filtered_I = self.I[row_index]
+                    filtered_J = self.J[row_index]
+                    filtered_Z = self.Z[row_index]
+                    # Filter out irrelevant cols
+                    col_index  = self.C[filtered_J]==c
+                    filtered_I = filtered_I[col_index]
+                    filtered_Z = filtered_Z[col_index]
+                    filtered_J = filtered_J[col_index]
+                    if len(filtered_Z)>0:
+                        # Build the current covariates matrix
+                        covariates = self.build_covariates(filtered_I, filtered_J)
+                        # call learner
+                        self.models[r,c].fit(covariates, filtered_Z)
+                        if self.train_loss_type == 'negloglik':
+                            total_error += self.train_loss(filtered_Z,self.models[r,c].model.predict_proba(covariates)).sum()
+                        else:
+                            total_error += self.train_loss(filtered_Z, self.models[r,c].predict(covariates)).sum()
+                        del covariates
         
         # Train the Semi_supervised co-clustering model
         if self.semi_supervised:
@@ -174,7 +202,8 @@ class GeneralScoalModel(object):
                 # Train the semi-supervised co-clustering model
                 self.ss_models[i].fit(training_vector, target)
                 # TODO : generalize this for models other than logistic (make it find obj fn or smthn)
-                self.obj_ss[i][train_indices] = abs(self.ss_models[i].model.predict_log_proba(training_vector))
+                # TODO: Vectorize the sum over the training samples
+                self.obj_ss[i][train_indices] = abs(np.log(self.ss_models[i].model.predict_proba(training_vector)))
                 if i == 0:
                     self.cumsum_obj[i] = np.sum([self.obj_ss[i][j,self.R[j]] for j in range(number)])
                 else:
@@ -207,7 +236,7 @@ class GeneralScoalModel(object):
                 for r in range(self.K):
                     if self.train_loss_type == 'negloglik':
                         # Calculate negative log likelihood
-                        current_errors = self.train_loss(filtered_Z, self.models[r,c].model.predict_log_proba(covariates))
+                        current_errors = self.train_loss(filtered_Z, self.models[r,c].model.predict_proba(covariates))
                     else:                 
                         # Calculate the (squared) prediction errors
                         current_errors = self.train_loss(filtered_Z, self.models[r,c].predict(covariates))
@@ -255,7 +284,7 @@ class GeneralScoalModel(object):
                 for c in range(self.L):
                     if self.train_loss_type == 'negloglik':
                         # Calculate negative log likelihood
-                        current_errors = self.train_loss(filtered_Z, self.models[r,c].model.predict_log_proba(covariates))
+                        current_errors = self.train_loss(filtered_Z, self.models[r,c].model.predict_proba(covariates))
                     else:                    
                         current_errors = self.train_loss(filtered_Z, self.models[r,c].predict(covariates))
                     current_col_count = np.bincount(filtered_J, minlength=self.N)
@@ -340,3 +369,52 @@ class GeneralScoalModel(object):
         predictions = sp.coo_matrix((total_predictions, (total_I, total_J)), shape=(self.M, self.N)).tocsr()
         prediction_list = np.array(predictions[I,J]).ravel()
         return prediction_list
+
+def test_process(x):
+    print x
+    import sys
+    sys.path.insert(0, '/home/neeraj/.eclipse/org.eclipse.platform_3.8_155965261/plugins/org.python.pydev_2.7.1.2012100913/pysrc/')
+    import pydevd;pydevd.settrace(port=5678)
+    x = x+2
+    print x
+    return
+
+def train_process(iterable_data):
+    #import sys
+    #sys.path.insert(0, '/home/neeraj/.eclipse/org.eclipse.platform_3.8_155965261/plugins/org.python.pydev_2.7.1.2012100913/pysrc/')
+    #import pydevd;pydevd.settrace()
+    (rc_list,R,C,I,J,rowAttr,colAttr,Z,learner_params,learner,train_loss_type,num_observations,M,N) = iterable_data
+    #pydevd.settrace()
+    # Gives an error for Logistic because in the current version of sklearn coef_ cannot be written to
+    # Initialize the model
+    model = learner_class(learner, learner_params)
+    print 'learning model'
+    #model.model.coef_ = models_coefs[0]
+    #model.model.intercept_ = models_coefs[1]
+    
+    # Filter out irrelevant rows
+    r = rc_list[0]
+    c = rc_list[1]
+    row_index  = R[I]==r
+    filtered_I = I[row_index]
+    filtered_J = J[row_index]
+    filtered_Z = Z[row_index]
+    # Filter out irrelevant cols
+    col_index  = C[filtered_J]==c
+    filtered_I = filtered_I[col_index]
+    filtered_Z = filtered_Z[col_index]
+    filtered_J = filtered_J[col_index]
+    if len(filtered_Z)>0:
+        # Build the current covariates matrix
+        # Extract and Normalize covariates
+        flat_index = (sp.coo_matrix((np.arange(num_observations), (I, J)), shape=(M,N))).tocsr()        
+        flat_index = np.array(flat_index[filtered_I, filtered_J], copy=False).ravel()
+        covariates = np.hstack((rowAttr[filtered_I], colAttr[filtered_J]))            
+        # call learner
+        model.fit(covariates, filtered_Z)
+        if train_loss_type == 'negloglik':
+            total_error = train_loss_dict[train_loss_type](filtered_Z, model.model.predict_proba(covariates)).sum()
+        else:
+            total_error = train_loss_dict[train_loss_type](filtered_Z, model.model.predict(covariates)).sum()
+    
+    return total_error,r,c,[model.model.coef_,model.model.intercept_]  

@@ -4,6 +4,7 @@ from sklearn import svm
 from numexpr import evaluate
 import numpy as np
 from SCOAL.kmeans import kMeans
+import sklearn as sk
 
 ones = np.ones
 class MeanModel(object):
@@ -59,8 +60,8 @@ classifiers = {# classifiers
                 # sparse classifiers
                 "sp-svm":svm.sparse.LinearSVC,
                 # sgd classifier
-                "sgd-class":linear_model.sparse.SGDClassifier
-                }#  add more as as needed
+                "sgd-class":linear_model.sparse.SGDClassifier,
+                "sgdlogistic":linear_model.SGDClassifier}#  add more as as needed
 clusterers = {#Clusterers
               "kMeans":kMeans # self kMeans class
               }   
@@ -112,8 +113,16 @@ def class_error(y_true, y_pred): # errors. Assumes probability and 0.5 threshold
 def logloss(y_true, y_pred): # log loss
     return evaluate("log(1+exp(-y*z))",{"y":y_true, "z":y_pred} )
 
-def negloglik(y_true,class_log_probs): # Returns the Negative log likelihood
-    log_probs = -np.array([class_log_probs[x,y_true[x]] for x in range(len(y_true))])
+def negloglik(y_true,class_probs): # Returns the Negative log likelihood
+    y_true = np.array(y_true)
+    class_probs = np.array(class_probs)
+    '''if sk.__version__.startswith('0.11'):
+        log_probs = -np.log(y_true*class_probs + (1-y_true)*(1-class_probs))
+        #log_probs = -np.array([(y_true[x]*class_log_probs[x] + (1-y_true[x])*(1-class_log_probs[x])) for x in range(len(y_true))])
+    elif sk.__version__.startswith('0.12'):
+        log_probs = -np.log(class_probs[xrange(len(y_true)),y_true])
+        #log_probs = -np.array([class_probs[x,y_true[x]] for x in range(len(y_true))])'''
+    log_probs = -np.log(class_probs[xrange(len(y_true)),y_true])
     return log_probs
 
 # test errors

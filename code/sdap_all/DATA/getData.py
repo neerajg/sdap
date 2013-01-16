@@ -127,14 +127,14 @@ def getRatingsTestData(k_fold, pctg_users, pctg_movies, K, L, datasetName,M=None
         np.random.shuffle(rand_idx)
         step_size = int(math.floor(len(trctd_Y)/k_fold))
         indices = range(0,len(trctd_Y)-1,step_size)
-        rand_users = copy.deepcopy(users)
+        rand_users = list(set(trctd_I))
         np.random.shuffle(rand_users)
-        rand_movies = copy.deepcopy(movies)
+        rand_movies = list(set(trctd_J))
         np.random.shuffle(rand_movies)
-        user_step_size = int(math.floor(len(users)/k_fold))
-        user_indices = range(0,len(users)-1,user_step_size)
-        movie_step_size = int(math.floor(len(movies)/k_fold))
-        movie_indices = range(0,len(movies)-1,movie_step_size)  
+        user_step_size = int(math.floor(len(rand_users)/k_fold))
+        user_indices = range(0,len(rand_users)-1,user_step_size)
+        movie_step_size = int(math.floor(len(rand_movies)/k_fold))
+        movie_indices = range(0,len(rand_movies)-1,movie_step_size)  
         print "  DONE SPLITTING DATA"
                 
         data = {'users':np.array(users),
@@ -336,22 +336,34 @@ def getColdStartDataFolds(fold, dataSet):
     val_movies = movie_indices[fold]
     
     user_val = rand_users[val_users:val_users+user_step_size-1]
-    np.sort(user_val)
+    user_val = np.sort(user_val)
     movie_val = rand_movies[val_movies:val_movies+movie_step_size-1]
-    np.sort(movie_val)
+    movie_val = np.sort(movie_val)
     
     # Add the ratings for the above users and movies in validation and the others in training
     train_indices = range(len(trctd_Y))
-    test_indices = [idx for idx in range(len(trctd_Y)) if trctd_I[idx] in user_val or trctd_J[idx] in movie_val]
+    test_indices1 = [idx for idx in range(len(trctd_Y)) if trctd_I[idx] in user_val]
+    test_indices2 = [idx for idx in range(len(trctd_Y)) if trctd_J[idx] in movie_val]
+    test_indices = list(set(test_indices1).union(set(test_indices2)))
     train_indices = np.array(list(set(train_indices).difference(set(test_indices))))
     
     train_Y = trctd_Y[train_indices]
     train_I = trctd_I[train_indices]
     train_J = trctd_J[train_indices]
-    
+
     val_Y = trctd_Y[test_indices]
     val_I = trctd_I[test_indices]
     val_J = trctd_J[test_indices]
+    
+    user_val = np.array(list(set(val_I).difference(set(train_I))))
+    movie_val = np.array(list(set(val_J).difference(set(train_J))))
+    test_indices = [idx for idx in test_indices if trctd_I[idx] in user_val and trctd_J[idx] in movie_val]
+    
+    #test_indices = [idx for idx in test_indices if val_I[idx] not in train_I and val_J[idx] not in train_J]
+    
+    val_Y = trctd_Y[test_indices]
+    val_I = trctd_I[test_indices]
+    val_J = trctd_J[test_indices]     
     
     val_X1 = trctd_X1[list(set(val_I))]
     val_X2 = trctd_X2[list(set(val_J))]

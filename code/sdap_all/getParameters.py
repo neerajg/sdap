@@ -77,15 +77,17 @@ def getParameters(param_file):
                         if model.upper()=='SCOAL':
                             sub_models_to_consider = list(set([x.split('+')[0] for x in submodels]))
                             if regularizers:
-                                reg_sets = list(set(regularizers[0]))
+                                reg_sets_toconsider = list(set(regularizers[0]))
                         else:
                             sub_models_to_consider = submodels
                             if regularizers:
-                                reg_sets = [[x,y]for x in regularizers[0] for y in regularizers[1]]                                
+                                reg_sets_toconsider = [[x,y]for x in regularizers[0] for y in regularizers[1]]                                
                         for submodel in sub_models_to_consider:
                             if model.upper()=='SS-SCOAL'and submodel.upper().split('+')[1]=='KMEANS':
                                 if regularizers:
-                                    reg_sets = list(set(regularizers[0]))
+                                    reg_sets = [[x,x]for x in list(set(regularizers[0]))]
+                            else:
+                                reg_sets = reg_sets_toconsider
                             for reg_set in reg_sets:
                                 parameter_set = {'test':testcase,
                                                  'datasetName':dataset,

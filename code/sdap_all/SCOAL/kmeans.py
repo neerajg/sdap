@@ -41,3 +41,13 @@ class kMeans():
         for k in range(self.k):
             self.dist[:,k] =  cdist(X,self.xk[k,:].reshape(1,X.shape[1]),'sqeuclidean').flatten()
         return self.dist
+    
+    # TODO:  Use the same name as the logistic method for now (change later)
+    # Given features returns the distance from each cluster centroid    
+    def predict_proba(self,X):
+        if self.flag:
+            self.dist = np.empty((X.shape[0],self.k))
+            self.flag = False
+        for k in range(self.k):
+            self.dist[:,k] =  cdist(X,self.xk[k,:].reshape(1,X.shape[1]),'sqeuclidean').flatten()
+        return self.dist    

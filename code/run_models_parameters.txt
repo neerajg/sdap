@@ -1,5 +1,5 @@
 datasets eHarmony2
-test all
+test hotStart
 models scoal ss-scoal
 submodels logistic+kMeans logistic+logistic
 K 2 

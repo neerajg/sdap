@@ -191,7 +191,13 @@ def learn_scoal(model, Z, W, K, L, learner,num_iter=100,
         if reg_op_learner is None:
             param={'tol':1e-4, 'fit_intercept':True, 'C':1.0}
         else:
-            param={'tol':1e-4, 'fit_intercept':True, 'C':reg_op_learner}
+            param={'tol':1e-4, 'fit_intercept':True, 'C':reg_op_learner}            
+    elif learner.upper()=='SGDLOGISTIC':
+        train_loss = 'negloglik'
+        if reg_op_learner is None:
+            param={'loss':'log','warm_start':True,'n_iter':10,'alpha':0.02}
+        else:
+            param={'loss':'log','warm_start':True,'n_iter':10,'alpha':reg_op_learner}        
     else:
         if reg_op_learner is None:
             param={'alpha':0.1}
@@ -209,11 +215,16 @@ def learn_scoal(model, Z, W, K, L, learner,num_iter=100,
         elif ss_learner == 'kMeans':
             param = [{'k':K},{'k':L}]
         model.init_ss_learner(ss_learner, param)
+    n_convg = 0
     while True:
         model.train() # Added the semi-supervised Training to the train method
         model.update_row_assignments() #Changed cost for update row and col
         model.update_col_assignments()
         if old_objective - model.objective < delta_convg:
+            n_convg +=1
+        else:
+            n_convg = 0
+        if n_convg >4:
             break
         old_objective = model.objective
         obj.append(old_objective)

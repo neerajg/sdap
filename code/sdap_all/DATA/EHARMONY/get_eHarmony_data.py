@@ -4,7 +4,6 @@ Title - Reads the features and ratings for the complete movielens data
 
 '''
 import sys
-#import recfile as rf
 import numpy as np
 
 from DATA.misc_tools import read_glob, sanitize_noncell_data
@@ -13,8 +12,8 @@ def geteHarmonyData(dataset):
     return getData(dataset)
 
 def getData(dataset):
-    pass  
-    '''dir = '/workspace/sdap/data/eHarmony/'
+    import recfile as rf
+    dir = '/workspace/sdap/data/eHarmony/'
     feature_files = ['EH-slice1-data.csv','EH-slice2-data.csv']
     ratings_files = ['EH-slice1-labels.csv','EH-slice2-labels.csv']
     num_users = [274654,211810]
@@ -53,7 +52,7 @@ def getData(dataset):
     J = J-1
     #ratings = np.loadtxt(ratings_file,dtype=float,delimiter=',')
     
-    return Xs,Y,I,J'''
+    return Xs,Y,I,J
 
 if __name__ == '__main__':
     geteHarmonyData(1)

@@ -13,9 +13,37 @@ import writeResults as op
 import run_model as runModel
 from  analyzeRMSE import analyzeRMSE
 from getParameters import getParameters
+from multiprocessing import Array
+from ctypes import c_double, c_int
+from numpy.ctypeslib import as_array
+from itertools import repeat, izip, product
+from multiprocessing import Pool
 
 # TO DO : for now we are using hard assignment for the attribute clusters for the warm and cold start cases
 # Change this to soft assignment for better performance later on
+
+def test_mult(parameter_set):
+    a = 2
+    print a
+    return
+
+def run_parameter_set(parameter_set):
+    K_R = {}
+    L_C = {}
+    K = parameter_set['K']
+    L = parameter_set['L']
+    datasetName = parameter_set['datasetName']
+    test = parameter_set['test']
+    model = parameter_set['model']
+    submodel = parameter_set['submodel']     
+    regs = parameter_set['regs']
+    if not regs:
+        regs = None             
+    model_name = model+'_'+submodel
+    t = time.time()                           
+    K_R,L_C = run_models(datasetName,test, model_name,K,L,regs=regs,delta_convg = 1e-4,num_iter = 40,k_fold = 10,pctg_users= 100,pctg_movies = 100,K_R=K_R,L_C=L_C)  
+    elapsed = time.time() - t
+    print 'ELAPSED TIME' + str(elapsed) 
 
 def run_models(datasetName,test, model_name,K,L,delta_convg,
                num_iter,k_fold,pctg_users,pctg_movies,regs = None,
@@ -24,7 +52,9 @@ def run_models(datasetName,test, model_name,K,L,delta_convg,
     if K_R is None:
         K_R = {}
     if L_C is None:
-        L_C = {}  
+        L_C = {}
+    K_R = {}
+    L_C = {}
     # Get the Data
     if datasetName.upper().split('_')[0] != 'TEST':    
         dataSet, centroids = data.getRatingsTestData(k_fold, pctg_users, pctg_movies, K, L, datasetName)
@@ -35,7 +65,7 @@ def run_models(datasetName,test, model_name,K,L,delta_convg,
     trctd_X2 = dataSet['trctd_X2']
     
     model_results = op.makeDir(model_name, datasetName)
-    set_folds = [0,1,2,3,4]#,5,6,7,8,9]
+    set_folds = [0,1,2,3,4,5,6,7,8,9]
             
     if test == 'all' or test == 'hotStart':
         for fold in set_folds:
@@ -62,12 +92,12 @@ def run_models(datasetName,test, model_name,K,L,delta_convg,
                 #log_likelihood_art_data = data.get_likelihood_art_data(alphas, pis, zs, betas, train_I, train_J, train_Y, trctd_X1, trctd_X2, datasetName, model_name)    
             train_op = runModel.runModelHotStart(model_name, K, L, trctd_X1, trctd_X2, train_I, train_J, train_Y, num_iter, delta_convg,regs,K_R,L_C)
             train_op['centroids']=[]
-            try:
+            '''try:
                 K_R[str(K)] = train_op['model'].R
                 L_C[str(L)] = train_op['model'].C
             except NameError:
                 K_R = {}
-                L_C = {}            
+                L_C = {}'''            
             print "  DONE TRAINING "+model_name+" FOR FOLD "+str(fold+1) 
             
             # Calculate Hot Start Training RMSE
@@ -111,6 +141,8 @@ def run_models(datasetName,test, model_name,K,L,delta_convg,
         #for fold in range(k_fold):
         for fold in set_folds:
             # Get Data Folds
+            K_R = {}
+            L_C = {}
             coldStartDataFold = data.getColdStartDataFolds(fold, dataSet)
             train_I = coldStartDataFold['train_I']
             train_J = coldStartDataFold['train_J']
@@ -148,6 +180,7 @@ def run_models(datasetName,test, model_name,K,L,delta_convg,
 
 if __name__ == '__main__':
     
+    parallel_crossval = True
     # Get Parameters
     if platform.system() == 'Windows':
         param_file = 'D:/sdap/code/run_models_parameters.txt'
@@ -155,23 +188,15 @@ if __name__ == '__main__':
         param_file = '/home/neeraj/sdap/code/run_models_parameters.txt'
         
     parameter_sets = getParameters(param_file)
-    K_R = {}
-    L_C = {}
-    for parameter_set in parameter_sets:
-        K = parameter_set['K']
-        L = parameter_set['L']
-        datasetName = parameter_set['datasetName']
-        test = parameter_set['test']
-        model = parameter_set['model']
-        submodel = parameter_set['submodel']     
-        regs = parameter_set['regs']
-        if not regs:
-            regs = None             
-        model_name = model+'_'+submodel
-        t = time.time()                           
-        K_R,L_C = run_models(datasetName,test, model_name,K,L,regs=regs,delta_convg = 1e-4,num_iter = 40,k_fold = 10,pctg_users= 100,pctg_movies = 100,K_R=K_R,L_C=L_C)  
-        elapsed = time.time() - t
-        print 'ELAPSED TIME' + str(elapsed)        
+    if parallel_crossval is True:
+        P = Pool(10)
+        result = P.map_async(run_parameter_set,parameter_sets)
+        #result = P.map(test_mult,parameter_sets)
+        P.close()
+        P.join() 
+    else:
+        for parameter_set in parameter_sets:
+            run_parameter_set(parameter_set)
             
     '''for i in range(len(Ks)):
         K = Ks[i]
